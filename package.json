@@ -1,0 +1,40 @@
+{
+  "name": "helpdesk-api",
+  "module": "index.js",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "@prisma/adapter-pg": "^7",
+    "@prisma/client": "^7",
+    "argon2": "^0.45.1",
+    "dotenv": "^18.0.7",
+    "express": "^5.3.0",
+    "pg": "^8.23.1",
+    "swagger-ui-express": "^5.0.1",
+    "yaml": "^2.9.1"
+  },
+  "scripts": {
+    "dev": "nodemon --watch src --exec bun src/index.js",
+    "start": "bun src/index.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:status": "prisma migrate status",
+    "db:seed": "prisma db seed",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "nodemon": "^3.1.14",
+    "prisma": "^7",
+    "supertest": "^7.3.1",
+    "vitest": "^5.0.3"
+  }
+}

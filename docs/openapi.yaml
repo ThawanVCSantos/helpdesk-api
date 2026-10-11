@@ -1,0 +1,24 @@
+openapi: 3.0.3
+info:
+  title: Help Desk API
+  description: API REST para gerenciamento de chamados de suporte de TI.
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000
+    description: Servidor Local
+paths:
+  /health:
+    get:
+      summary: Verificação de saúde da aplicação
+      description: Retorna o status de integridade do serviço da API.
+      responses:
+        '200':
+          description: Serviço operando normalmente
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
