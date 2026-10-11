@@ -5,6 +5,10 @@
 ### Pré-requisitos
 
 - Docker e Docker Compose instalados.
+- [Bun](https://bun.sh/) (v1.3+ ou superior) para executar testes e scripts locais:
+  ```bash
+  npm install -g bun
+  ```
 - Arquivo `.env` configurado a partir do `.env.example`.
 
 ### Inicialização
