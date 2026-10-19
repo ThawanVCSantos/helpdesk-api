@@ -9,9 +9,13 @@
     "argon2": "^0.45.1",
     "dotenv": "^18.0.7",
     "express": "^5.3.0",
+    "handlebars": "^4.7.10",
+    "jsonwebtoken": "^9.0.3",
+    "nodemailer": "^10.1.7",
     "pg": "^8.23.1",
     "swagger-ui-express": "^5.0.1",
-    "yaml": "^2.9.1"
+    "yaml": "^2.9.1",
+    "zod": "^4.6.7"
   },
   "scripts": {
     "dev": "nodemon --watch src --exec bun src/index.js",

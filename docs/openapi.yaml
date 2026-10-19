@@ -22,3 +22,240 @@ paths:
                   status:
                     type: string
                     example: ok
+  /auth/login:
+    post:
+      tags:
+        - Autenticação
+      summary: Autenticar usuário
+      description: Realiza login com e-mail e senha e retorna token JWT.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: admin@admin.com
+                password:
+                  type: string
+                  example: admin123
+      responses:
+        '200':
+          description: Login realizado com sucesso
+        '401':
+          description: Credenciais inválidas ou usuário inativo
+  /auth/forgot-password:
+    post:
+      tags:
+        - Autenticação
+      summary: Solicitar recuperação de senha
+      description: Envia um e-mail com token seguro para redefinição de senha.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: user@example.com
+      responses:
+        '200':
+          description: Instruções enviadas se o e-mail existir
+  /auth/reset-password:
+    post:
+      tags:
+        - Autenticação
+      summary: Redefinir senha com token
+      description: Redefine a senha de um usuário utilizando o token recebido por e-mail.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token, password]
+              properties:
+                token:
+                  type: string
+                password:
+                  type: string
+                  example: NovaSenha123!
+      responses:
+        '200':
+          description: Senha redefinida com sucesso
+        '400':
+          description: Token inválido ou expirado
+  /auth/me:
+    get:
+      tags:
+        - Autenticação
+      summary: Obter dados do usuário logado
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Perfil do usuário autenticado
+        '401':
+          description: Não autenticado
+  /users:
+    post:
+      tags:
+        - Usuários
+      summary: Criar usuário (Admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name:
+                  type: string
+                  example: Carlos Silva
+                email:
+                  type: string
+                  format: email
+                  example: carlos@empresa.com
+                roles:
+                  type: array
+                  items:
+                    type: string
+                    enum: [USER, AGENT, ADMIN]
+                  default: [USER]
+      responses:
+        '201':
+          description: Usuário criado com sucesso
+        '400':
+          description: Dados de entrada inválidos
+        '403':
+          description: Acesso restrito a administradores
+        '409':
+          description: E-mail já cadastrado
+    get:
+      tags:
+        - Usuários
+      summary: Listar usuários (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: active
+          schema:
+            type: boolean
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista paginada de usuários
+        '403':
+          description: Acesso restrito a administradores
+  /users/{id}:
+    get:
+      tags:
+        - Usuários
+      summary: Buscar usuário por ID (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Dados do usuário
+        '404':
+          description: Usuário não encontrado
+    put:
+      tags:
+        - Usuários
+      summary: Atualizar usuário (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                roles:
+                  type: array
+                  items:
+                    type: string
+                    enum: [USER, AGENT, ADMIN]
+      responses:
+        '200':
+          description: Usuário atualizado
+        '404':
+          description: Usuário não encontrado
+  /users/{id}/active:
+    patch:
+      tags:
+        - Usuários
+      summary: Ativar ou desativar usuário (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [active]
+              properties:
+                active:
+                  type: boolean
+      responses:
+        '204':
+          description: Status de ativação atualizado
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

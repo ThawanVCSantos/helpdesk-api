@@ -147,14 +147,14 @@ Principais atributos:
 - `id` — UUID
 - `name`
 - `email`
-- `password` — nullable enquanto o usuário aguarda ativação; quando definida, é armazenada com hash Argon2id
+- `password` — nullable enquanto o usuário aguarda definir a senha; quando definida, é armazenada com hash Argon2id
 - `active`
 - `createdAt`
 - `updatedAt`
 
-Usuários desativados não poderão realizar autenticação, mas seus registros serão mantidos para preservar o histórico do sistema.
+Usuários desativados não poderão realizar autenticação, mas seus registros serão mantidos para preservar o histórico do sistema. Um usuário recém-criado pode estar ativo administrativamente mesmo sem senha; sem senha configurada, ele ainda não pode autenticar.
 
-Não haverá cadastro público de usuários. Novos usuários serão criados por administradores e receberão um token temporário por e-mail para realizar a ativação e definir a senha inicial.
+Não haverá cadastro público de usuários. Novos usuários serão criados por administradores e receberão um token temporário por e-mail para definir a senha inicial.
 
 O primeiro administrador será criado por meio de um seed durante a inicialização do ambiente.
 
@@ -535,9 +535,8 @@ erDiagram
 
 15. Para cada tipo de token, somente o token mais recente poderá permanecer válido. A emissão de um novo token do mesmo tipo deverá revogar o anterior.
 
-16. `PASSWORD_SETUP` será utilizado para ativação do usuário e definição da senha inicial.
-
-17. `PASSWORD_RESET` será utilizado para recuperação ou redefinição de senha de usuários já ativados.
+16. `PASSWORD_SETUP` será utilizado no primeiro acesso para definição da senha inicial.
+17. `PASSWORD_RESET` será utilizado para recuperação ou redefinição de senha. O mesmo fluxo de recuperação também pode ser utilizado por usuários que ainda não configuraram a senha inicial.
 
 18. Senhas não deverão ser armazenadas em texto puro. O sistema deverá armazená-las utilizando um mecanismo seguro de hash de senha.
 
@@ -551,7 +550,7 @@ erDiagram
 
 23. Usuários recém-criados deverão realizar a ativação e definição da senha inicial por meio de um token enviado por e-mail.
 
-24. Enquanto o usuário estiver pendente de ativação, um novo `PASSWORD_SETUP` poderá ser solicitado para reenvio do convite.
+24. Usuários que não receberam ou perderam o token inicial deverão utilizar o fluxo de recuperação de senha para solicitar um novo token.
 
 25. Operações administrativas deverão ser protegidas por autorização baseada no papel do usuário.
 
@@ -571,7 +570,7 @@ erDiagram
 - Ativação de usuários e definição inicial de senha por e-mail.
 - Recuperação/redefinição de senha por e-mail.
 - Expiração e invalidação de tokens de ativação e recuperação.
-- Reenvio do convite de ativação para usuários ainda não ativados.
+- Recuperação de senha também aplicável ao primeiro acesso de usuários sem senha configurada.
 - Proteção de informações sensíveis.
 
 O sistema não terá cadastro público. O primeiro administrador será criado por meio de seed, e os demais usuários serão cadastrados pelos administradores.

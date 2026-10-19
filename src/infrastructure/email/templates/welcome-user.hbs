@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      line-height: 1.6;
+      color: #333333;
+      background-color: #f4f6f8;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #ffffff;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    }
+
+    .header {
+      border-bottom: 2px solid #10b981;
+      padding-bottom: 12px;
+      margin-bottom: 20px;
+    }
+
+    .header h1 {
+      color: #065f46;
+      margin: 0;
+      font-size: 22px;
+    }
+
+    .token-box {
+      background-color: #ecfdf5;
+      border-left: 4px solid #10b981;
+      padding: 12px 16px;
+      margin: 20px 0;
+      font-family: monospace;
+      font-size: 16px;
+      font-weight: bold;
+      color: #064e3b;
+      word-break: break-all;
+    }
+
+    .footer {
+      margin-top: 30px;
+      font-size: 12px;
+      color: #64748b;
+      border-top: 1px solid #e2e8f0;
+      padding-top: 15px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>Bem-vindo ao HelpDesk!</h1>
+    </div>
+    <p>Olá, <strong>{{name}}</strong>!</p>
+    <p>Sua conta foi criada por um administrador no HelpDesk.</p>
+    <p>Para definir sua senha e ativar seu acesso, utilize o token abaixo no endpoint de redefinição de senha:</p>
+
+    <div class="token-box">
+      {{token}}
+    </div>
+
+    <p>Para concluir a ativação da sua conta e definir sua senha, envie uma requisição <strong>POST
+        /auth/reset-password</strong> contendo este token e sua nova senha.</p>
+
+    <p>Este token expira em <strong>{{expiresInMinutes}} minutos</strong>.</p>
+
+    <div class="footer">
+      <p>Equipe HelpDesk &bull; Mensagem automática, favor não responder.</p>
+    </div>
+  </div>
+</body>
+
+</html>
