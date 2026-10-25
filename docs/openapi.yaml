@@ -253,9 +253,545 @@ paths:
       responses:
         '204':
           description: Status de ativação atualizado
+  /categories:
+    get:
+      tags:
+        - Categorias
+      summary: Listar categorias
+      description: Retorna as categorias de chamados cadastradas no sistema.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: active
+          schema:
+            type: boolean
+          description: Filtrar por status ativo/inativo
+        - in: query
+          name: search
+          schema:
+            type: string
+          description: Busca por nome ou descrição
+      responses:
+        '200':
+          description: Lista de categorias
+    post:
+      tags:
+        - Categorias
+      summary: Criar nova categoria (Admin)
+      description: Cadastra uma nova categoria de chamado no sistema.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                  example: Redes e Conectividade
+                description:
+                  type: string
+                  example: Problemas relacionados a conexão de rede ou Wi-Fi
+                active:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Categoria criada com sucesso
+        '400':
+          description: Erro de validação
+        '409':
+          description: Categoria já existente com este nome
+  /categories/{id}:
+    get:
+      tags:
+        - Categorias
+      summary: Obter detalhes da categoria
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalhes da categoria
+        '404':
+          description: Categoria não encontrada
+    put:
+      tags:
+        - Categorias
+      summary: Atualizar categoria (Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                description:
+                  type: string
+                active:
+                  type: boolean
+      responses:
+        '200':
+          description: Categoria atualizada
+        '404':
+          description: Categoria não encontrada
+        '409':
+          description: Conflito de nome duplicado
+  /tickets:
+    get:
+      tags:
+        - Chamados
+      summary: Listar chamados
+      description: Lista chamados com paginação e filtros. Usuários comuns visualizam apenas seus próprios chamados.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 10
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [OPEN, IN_PROGRESS, WAITING_USER, RESOLVED, CLOSED]
+        - in: query
+          name: priority
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: requesterId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: assignedUserId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Lista paginada de chamados
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/TicketSummary'
+                  meta:
+                    type: object
+                    properties:
+                      total:
+                        type: integer
+                      page:
+                        type: integer
+                      limit:
+                        type: integer
+                      totalPages:
+                        type: integer
+    post:
+      tags:
+        - Chamados
+      summary: Abrir um novo chamado
+      description: Usuário autenticado registra um chamado no suporte.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, description, categoryId]
+              properties:
+                title:
+                  type: string
+                  example: Computador não liga
+                description:
+                  type: string
+                  example: Ao apertar o botão liga/desliga, nada acontece.
+                priority:
+                  type: string
+                  enum: [LOW, MEDIUM, HIGH, CRITICAL]
+                  default: MEDIUM
+                categoryId:
+                  type: string
+                  format: uuid
+                dueDate:
+                  type: string
+                  format: date-time
+      responses:
+        '201':
+          description: Chamado criado com sucesso
+        '400':
+          description: Categoria inativa ou dados inválidos
+        '404':
+          description: Categoria não encontrada
+  /tickets/{id}:
+    get:
+      tags:
+        - Chamados
+      summary: Obter detalhes do chamado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detalhes completos do chamado
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TicketDetail'
+        '403':
+          description: Usuário não tem permissão para visualizar este chamado
+        '404':
+          description: Chamado não encontrado
+    put:
+      tags:
+        - Chamados
+      summary: Atualizar chamado
+      description: Atualiza campos permitidos de acordo com o perfil do solicitante.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: string
+                  enum: [LOW, MEDIUM, HIGH, CRITICAL]
+                categoryId:
+                  type: string
+                  format: uuid
+                dueDate:
+                  type: string
+                  format: date-time
+      responses:
+        '200':
+          description: Chamado atualizado com sucesso
+        '400':
+          description: Chamado fechado não pode ser alterado
+        '403':
+          description: Permissão negada
+        '404':
+          description: Chamado ou categoria não encontrados
+  /tickets/{id}/assign:
+    patch:
+      tags:
+        - Chamados
+      summary: Atribuir ou remover responsável do chamado (Agente / Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignedUserId]
+              properties:
+                assignedUserId:
+                  type: string
+                  format: uuid
+                  nullable: true
+      responses:
+        '200':
+          description: Responsável atualizado com sucesso
+        '400':
+          description: Usuário não possui perfil de atendimento ou está inativo
+        '403':
+          description: Restrito a agentes e administradores
+  /tickets/{id}/status:
+    patch:
+      tags:
+        - Chamados
+      summary: Atualizar status do chamado (Agente / Admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [OPEN, IN_PROGRESS, WAITING_USER, RESOLVED, CLOSED]
+      responses:
+        '200':
+          description: Status atualizado com sucesso
+        '400':
+          description: Status inválido
+        '403':
+          description: Restrito a agentes e administradores
+  /tickets/{ticketId}/comments:
+    get:
+      tags:
+        - Comentários
+      summary: Listar comentários de um chamado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de comentários
+        '403':
+          description: Permissão negada
+        '404':
+          description: Chamado não encontrado
+    post:
+      tags:
+        - Comentários
+      summary: Adicionar comentário em um chamado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content:
+                  type: string
+                  example: Testei o cabo de energia e agora deu sinal.
+      responses:
+        '201':
+          description: Comentário adicionado com sucesso
+        '400':
+          description: Chamado encerrado não aceita novos comentários
+        '403':
+          description: Permissão negada
+        '404':
+          description: Chamado não encontrado
+  /tickets/{ticketId}/events:
+    get:
+      tags:
+        - Histórico e Auditoria
+      summary: Obter histórico de eventos do chamado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista cronológica de eventos de auditoria do chamado
+        '403':
+          description: Permissão negada
+        '404':
+          description: Chamado não encontrado
 components:
   securitySchemes:
     BearerAuth:
       type: http
       scheme: bearer
       bearerFormat: JWT
+  schemas:
+    UserSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        email:
+          type: string
+          format: email
+        roles:
+          type: array
+          items:
+            type: string
+
+    CategorySummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+
+    TicketSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        title:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [OPEN, IN_PROGRESS, WAITING_USER, RESOLVED, CLOSED]
+        priority:
+          type: string
+          enum: [LOW, MEDIUM, HIGH, CRITICAL]
+        requesterId:
+          type: string
+          format: uuid
+        categoryId:
+          type: string
+          format: uuid
+        assignedUserId:
+          type: string
+          format: uuid
+          nullable: true
+        dueDate:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        requester:
+          $ref: '#/components/schemas/UserSummary'
+        assignedUser:
+          $ref: '#/components/schemas/UserSummary'
+        category:
+          $ref: '#/components/schemas/CategorySummary'
+
+    TicketDetail:
+      allOf:
+        - $ref: '#/components/schemas/TicketSummary'
+        - type: object
+          properties:
+            comments:
+              type: array
+              description: Lista cronológica de comentários do chamado
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  content:
+                    type: string
+                  createdAt:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/UserSummary'
+            events:
+              type: array
+              description: Linha do tempo de eventos de auditoria do chamado
+              items:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                  type:
+                    type: string
+                  metadata:
+                    type: object
+                  createdAt:
+                    type: string
+                    format: date-time
+                  user:
+                    $ref: '#/components/schemas/UserSummary'

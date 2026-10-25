@@ -25,7 +25,8 @@ export class UsersController {
 
   list = async (req, res, next) => {
     try {
-      const { page, limit, active, search } = req.validated.query;
+      const query = req.validated?.query || req.query || {};
+      const { page, limit, active, search } = query;
       const result = await this.listUsersUseCase.execute({
         page,
         limit,
