@@ -3,12 +3,14 @@ import { ForbiddenError } from '../../../domain/errors/forbidden-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { isUserOnly } from '../../../shared/utils/roles.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 export class UpdateTicket {
-  constructor({ ticketsRepository, categoriesRepository, ticketEventsRepository }) {
+  constructor({ ticketsRepository, categoriesRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
     this.ticketsRepository = ticketsRepository;
     this.categoriesRepository = categoriesRepository;
     this.ticketEventsRepository = ticketEventsRepository;
+    this.dispatchTicketNotifications = dispatchTicketNotifications;
   }
 
   async execute({ id, user, title, description, priority, categoryId, dueDate }) {
@@ -54,6 +56,23 @@ export class UpdateTicket {
         type: 'PRIORITY_CHANGED',
         metadata: { oldPriority: ticket.priority, newPriority: priority },
       });
+
+      if (this.dispatchTicketNotifications) {
+        try {
+          await this.dispatchTicketNotifications.execute({
+            ticket: updated,
+            actorUserId: user.id,
+            type: 'PRIORITY_CHANGED',
+          });
+        } catch (error) {
+          logger.error('Failed to dispatch ticket notifications', {
+            ticketId: id,
+            actorUserId: user.id,
+            type: 'PRIORITY_CHANGED',
+            error: error.message,
+          });
+        }
+      }
     }
 
     if (categoryId && categoryId !== ticket.categoryId) {

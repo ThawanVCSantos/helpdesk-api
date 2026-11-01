@@ -628,35 +628,34 @@ Cada notificação pertence a um destinatário e canal. A caixa interna e a futu
 
 ## API externa
 
-O projeto deverá utilizar uma API ou serviço externo de maneira significativa em uma funcionalidade do sistema.
+O projeto utiliza o **Cloudinary** como serviço externo de armazenamento e gerenciamento dos arquivos enviados como anexos em chamados e comentários.
 
-Uma das opções planejadas é utilizar o **Cloudinary** para armazenamento e gerenciamento dos arquivos enviados como anexos.
-
-Nesse cenário, o sistema será responsável por controlar os metadados e relacionamentos dos anexos, enquanto o armazenamento físico dos arquivos será realizado pelo serviço externo.
-
-A integração deverá fazer parte efetiva do fluxo da aplicação, e não apenas consistir em uma consulta isolada.
+Nesse cenário, o sistema é responsável por controlar os metadados e relacionamentos dos anexos (persisti-los via Prisma no PostgreSQL), enquanto o upload seguro, processamento e entrega de mídia são delegados à API do Cloudinary.
 
 ## Tecnologias
 
-- Node.js
+- Node.js & Bun
 - Express
-- PostgreSQL
+- PostgreSQL & Prisma ORM
 - Docker
-- JWT
-- API externa para armazenamento de arquivos
+- JWT & Argon2
+- Cloudinary (API externa para armazenamento de arquivos e anexos)
+- Nodemailer & Handlebars (templates de e-mail)
+- node-schedule (processamento em segundo plano e retentativas)
+- Vitest & Supertest
 - Swagger/OpenAPI
 - Postman
 
-A arquitetura será estruturada seguindo princípios de **Clean Architecture**, buscando separar regras de negócio, casos de uso, acesso à aplicação, persistência e integrações externas.
+A arquitetura é estruturada seguindo princípios de **Clean Architecture**, com separação estrita de regras de negócio, casos de uso, apresentação HTTP, persistência e integrações externas.
 
 ## Identificadores
 
-As entidades do sistema utilizarão **UUIDs** como identificadores.
-
-Além de dificultar a enumeração simples de recursos, a padronização facilita a geração e integração dos identificadores entre diferentes componentes do sistema.
+As entidades do sistema utilizam **UUIDs** como identificadores padronizados.
 
 ## Status do projeto
 
-**Em desenvolvimento**
+**Operações de CRUD e Integração Funcional Concluídas**
 
-O projeto encontra-se na etapa de definição do escopo e modelagem inicial. As decisões de arquitetura, entidades e regras poderão ser refinadas conforme as necessidades identificadas durante a implementação.
+- CRUD completo de Usuários, Sessões/Autenticação, Categorias, Chamados, Comentários, Histórico/Eventos de Auditoria, Anexos e Notificações.
+- Integração funcional com o Cloudinary para upload e deleção de anexos.
+- Notificações internas (`IN_APP`) com controle de leitura e notificações por e-mail (`EMAIL`) com worker em segundo plano, retentativa automática configurável (máximo de 10 tentativas) e templates Handlebars.

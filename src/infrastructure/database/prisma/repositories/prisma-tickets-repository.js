@@ -21,8 +21,10 @@ export class PrismaTicketsRepository {
           orderBy: { createdAt: 'asc' },
           include: {
             user: { include: { roles: { include: { role: true } } } },
+            attachments: { include: { attachment: true } },
           },
         },
+        attachments: { include: { attachment: true } },
         events: {
           orderBy: { createdAt: 'asc' },
           include: {

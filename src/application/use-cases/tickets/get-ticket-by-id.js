@@ -4,8 +4,9 @@ import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { isUserOnly } from '../../../shared/utils/roles.js';
 
 export class GetTicketById {
-  constructor({ ticketsRepository }) {
+  constructor({ ticketsRepository, storageService }) {
     this.ticketsRepository = ticketsRepository;
+    this.storageService = storageService;
   }
 
   async execute({ id, user }) {
@@ -18,6 +19,6 @@ export class GetTicketById {
       throw new ForbiddenError('Você não tem permissão para acessar este chamado');
     }
 
-    return TicketMapper.toDTO(ticket);
+    return TicketMapper.toDTO(ticket, { storageService: this.storageService });
   }
 }

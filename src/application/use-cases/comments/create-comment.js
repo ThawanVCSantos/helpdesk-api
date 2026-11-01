@@ -3,12 +3,14 @@ import { ForbiddenError } from '../../../domain/errors/forbidden-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { CommentMapper } from '../../mappers/comment-mapper.js';
 import { isUserOnly } from '../../../shared/utils/roles.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 export class CreateComment {
-  constructor({ ticketsRepository, commentsRepository, ticketEventsRepository }) {
+  constructor({ ticketsRepository, commentsRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
     this.ticketsRepository = ticketsRepository;
     this.commentsRepository = commentsRepository;
     this.ticketEventsRepository = ticketEventsRepository;
+    this.dispatchTicketNotifications = dispatchTicketNotifications;
   }
 
   async execute({ ticketId, user, content }) {
@@ -37,6 +39,23 @@ export class CreateComment {
       type: 'COMMENT_ADDED',
       metadata: { commentId: comment.id },
     });
+
+    if (this.dispatchTicketNotifications) {
+      try {
+        await this.dispatchTicketNotifications.execute({
+          ticket,
+          actorUserId: user.id,
+          type: 'NEW_COMMENT',
+        });
+      } catch (error) {
+        logger.error('Failed to dispatch comment notifications', {
+          ticketId,
+          commentId: comment.id,
+          actorUserId: user.id,
+          error: error.message,
+        });
+      }
+    }
 
     return CommentMapper.toDTO(comment);
   }

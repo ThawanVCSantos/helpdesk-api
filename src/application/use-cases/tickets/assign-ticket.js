@@ -2,12 +2,14 @@ import { BadRequestError } from '../../../domain/errors/bad-request-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { canHandleTickets } from '../../../shared/utils/roles.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 export class AssignTicket {
-  constructor({ ticketsRepository, usersRepository, ticketEventsRepository }) {
+  constructor({ ticketsRepository, usersRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
     this.ticketsRepository = ticketsRepository;
     this.usersRepository = usersRepository;
     this.ticketEventsRepository = ticketEventsRepository;
+    this.dispatchTicketNotifications = dispatchTicketNotifications;
   }
 
   async execute({ id, actorUser, assignedUserId }) {
@@ -47,6 +49,23 @@ export class AssignTicket {
         newAssignedUserId: assignedUserId,
       },
     });
+
+    if (this.dispatchTicketNotifications) {
+      try {
+        await this.dispatchTicketNotifications.execute({
+          ticket: updated,
+          actorUserId: actorUser.id,
+          type: 'TICKET_ASSIGNED',
+        });
+      } catch (error) {
+        logger.error('Failed to dispatch ticket notifications', {
+          ticketId: id,
+          actorUserId: actorUser.id,
+          type: 'TICKET_ASSIGNED',
+          error: error.message,
+        });
+      }
+    }
 
     return TicketMapper.toDTO(updated);
   }

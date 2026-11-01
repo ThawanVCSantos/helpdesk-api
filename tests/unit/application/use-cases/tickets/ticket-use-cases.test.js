@@ -7,6 +7,8 @@ import { AssignTicket } from '../../../../../src/application/use-cases/tickets/a
 import { ChangeTicketStatus } from '../../../../../src/application/use-cases/tickets/change-ticket-status.js';
 import { CreateComment } from '../../../../../src/application/use-cases/comments/create-comment.js';
 import { ListComments } from '../../../../../src/application/use-cases/comments/list-comments.js';
+import { GetCommentById } from '../../../../../src/application/use-cases/comments/get-comment-by-id.js';
+import { logger } from '../../../../../src/infrastructure/logging/logger.js';
 import { ListTicketEvents } from '../../../../../src/application/use-cases/tickets/list-ticket-events.js';
 
 import { BadRequestError } from '../../../../../src/domain/errors/bad-request-error.js';
@@ -212,6 +214,45 @@ describe('Tickets & Business Rules Use Cases', () => {
     );
   });
 
+  it('logs notification failures without failing comment creation', async () => {
+    const ticket = new Ticket({ id: 't-1', requesterId: userCommon.id, status: 'OPEN' });
+    const commentsRepository = {
+      create: vi.fn().mockResolvedValue(new Comment({
+        id: 'c-1',
+        ticketId: 't-1',
+        userId: userCommon.id,
+        content: 'Aguardando atualização.',
+      })),
+    };
+    const dispatchTicketNotifications = {
+      execute: vi.fn().mockRejectedValue(new Error('notification database unavailable')),
+    };
+    const loggerSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
+
+    const useCase = new CreateComment({
+      ticketsRepository: { findById: vi.fn().mockResolvedValue(ticket) },
+      commentsRepository,
+      ticketEventsRepository: { create: vi.fn() },
+      dispatchTicketNotifications,
+    });
+
+    await expect(useCase.execute({
+      ticketId: 't-1',
+      user: userCommon,
+      content: 'Aguardando atualização.',
+    })).resolves.toMatchObject({ id: 'c-1' });
+
+    expect(loggerSpy).toHaveBeenCalledWith(
+      'Failed to dispatch comment notifications',
+      expect.objectContaining({
+        ticketId: 't-1',
+        commentId: 'c-1',
+        error: 'notification database unavailable',
+      })
+    );
+    loggerSpy.mockRestore();
+  });
+
   it('lists comments and ticket events', async () => {
     const ticket = new Ticket({ id: 't-1', requesterId: userCommon.id });
     const ticketsRepository = { findById: vi.fn().mockResolvedValue(ticket) };
@@ -233,6 +274,49 @@ describe('Tickets & Business Rules Use Cases', () => {
     const listEvents = new ListTicketEvents({ ticketsRepository, ticketEventsRepository });
     const events = await listEvents.execute({ ticketId: 't-1', user: userCommon });
     expect(events).toHaveLength(1);
+  });
+
+  it('gets a comment by id with attachments and enforces ticket access', async () => {
+    const commentsRepository = {
+      findById: vi.fn().mockResolvedValue(null),
+    };
+    const ticketsRepository = { findById: vi.fn() };
+    const useCase = new GetCommentById({
+      commentsRepository,
+      ticketsRepository,
+      storageService: { getUrl: (key) => `https://files.test/${key}` },
+    });
+
+    await expect(
+      useCase.execute({ id: 'comment-1', user: userCommon })
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    commentsRepository.findById.mockResolvedValue({
+      id: 'comment-1',
+      ticketId: 'ticket-1',
+      userId: 'other-user',
+      content: 'Comentário',
+      attachments: [],
+    });
+    ticketsRepository.findById.mockResolvedValue(null);
+    await expect(
+      useCase.execute({ id: 'comment-1', user: userCommon })
+    ).rejects.toBeInstanceOf(NotFoundError);
+
+    ticketsRepository.findById.mockResolvedValue({
+      id: 'ticket-1',
+      requesterId: 'other-user',
+    });
+    await expect(
+      useCase.execute({ id: 'comment-1', user: userCommon })
+    ).rejects.toBeInstanceOf(ForbiddenError);
+
+    ticketsRepository.findById.mockResolvedValue({
+      id: 'ticket-1',
+      requesterId: userCommon.id,
+    });
+    const result = await useCase.execute({ id: 'comment-1', user: userCommon });
+    expect(result).toMatchObject({ id: 'comment-1', content: 'Comentário', attachments: [] });
   });
 
   it('updates ticket and registers audit events', async () => {

@@ -3,6 +3,7 @@ import { UserMapper } from './user-mapper.js';
 import { CategoryMapper } from './category-mapper.js';
 import { CommentMapper } from './comment-mapper.js';
 import { TicketEventMapper } from './ticket-event-mapper.js';
+import { AttachmentMapper } from './attachment-mapper.js';
 
 export class TicketMapper {
   static toDomain(raw) {
@@ -26,10 +27,13 @@ export class TicketMapper {
       category: raw.category ? CategoryMapper.toDomain(raw.category) : null,
       comments: Array.isArray(raw.comments) ? raw.comments.map((c) => CommentMapper.toDomain(c)) : [],
       events: Array.isArray(raw.events) ? raw.events.map((e) => TicketEventMapper.toDomain(e)) : [],
+      attachments: Array.isArray(raw.attachments)
+        ? raw.attachments.map((item) => AttachmentMapper.toDomain(item.attachment || item))
+        : [],
     });
   }
 
-  static toDTO(ticket) {
+  static toDTO(ticket, options = {}) {
     if (!ticket) return null;
 
     return {
@@ -48,8 +52,11 @@ export class TicketMapper {
       requester: ticket.requester ? UserMapper.toDTO(ticket.requester) : null,
       assignedUser: ticket.assignedUser ? UserMapper.toDTO(ticket.assignedUser) : null,
       category: ticket.category ? CategoryMapper.toDTO(ticket.category) : null,
-      comments: ticket.comments ? CommentMapper.toDTOList(ticket.comments) : [],
+      comments: ticket.comments ? CommentMapper.toDTOList(ticket.comments, options) : [],
       events: ticket.events ? TicketEventMapper.toDTOList(ticket.events) : [],
+      attachments: ticket.attachments.map((attachment) =>
+        AttachmentMapper.toDTO(attachment, options)
+      ),
     };
   }
 

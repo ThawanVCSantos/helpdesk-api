@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { AuthController } from '../../../src/presentation/http/controllers/auth-controller.js';
 import { UsersController } from '../../../src/presentation/http/controllers/users-controller.js';
+import { NotificationsController } from '../../../src/presentation/http/controllers/notifications-controller.js';
 
 const response = () => ({
   status: vi.fn().mockReturnThis(),
@@ -46,6 +47,42 @@ describe('HTTP controllers', () => {
     await controller.setActive({ params: { id: 'user-id' }, body: { active: false } }, res, next);
 
     expect(res.status).toHaveBeenCalledWith(204);
+    expect(next).not.toHaveBeenCalled();
+  });
+
+  it('uses validated notification pagination values', async () => {
+    const res = response();
+    const next = vi.fn();
+    const execute = vi.fn().mockResolvedValue({
+      data: [],
+      pagination: { total: 0, page: 1, limit: 20, totalPages: 1, unreadCount: 0 },
+    });
+    const controller = new NotificationsController({
+      listUserNotifications: { execute },
+      markNotificationAsRead: { execute: vi.fn() },
+      markAllNotificationsAsRead: { execute: vi.fn() },
+      processPendingNotificationsJob: { run: vi.fn() },
+    });
+
+    await controller.list(
+      {
+        user: { id: 'user-id' },
+        query: { page: '1', limit: '20', channel: 'IN_APP' },
+        validated: {
+          query: { page: 1, limit: 20, unreadOnly: false, channel: 'IN_APP' },
+        },
+      },
+      res,
+      next
+    );
+
+    expect(execute).toHaveBeenCalledWith({
+      user: { id: 'user-id' },
+      page: 1,
+      limit: 20,
+      unreadOnly: false,
+      channel: 'IN_APP',
+    });
     expect(next).not.toHaveBeenCalled();
   });
 });

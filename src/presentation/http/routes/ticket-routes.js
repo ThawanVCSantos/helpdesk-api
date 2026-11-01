@@ -13,6 +13,7 @@ import { changeTicketStatusSchema } from '../validators/tickets/change-ticket-st
 import { createCommentSchema } from '../validators/tickets/create-comment-schema.js';
 import { listCommentsSchema } from '../validators/tickets/list-comments-schema.js';
 import { listTicketEventsSchema } from '../validators/tickets/list-ticket-events-schema.js';
+import { getCommentByIdSchema } from '../validators/tickets/get-comment-by-id-schema.js';
 
 export const ticketsRouter = Router();
 const ticketsController = makeTicketsController();
@@ -38,6 +39,7 @@ ticketsRouter.patch(
   ticketsController.changeStatus
 );
 
+ticketsRouter.get('/comments/:id', validateSchema(getCommentByIdSchema), ticketsController.getCommentById);
 ticketsRouter.post('/:ticketId/comments', validateSchema(createCommentSchema), ticketsController.createComment);
 ticketsRouter.get('/:ticketId/comments', validateSchema(listCommentsSchema), ticketsController.listComments);
 

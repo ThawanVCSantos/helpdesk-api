@@ -4,9 +4,10 @@ import { CommentMapper } from '../../mappers/comment-mapper.js';
 import { isUserOnly } from '../../../shared/utils/roles.js';
 
 export class ListComments {
-  constructor({ ticketsRepository, commentsRepository }) {
+  constructor({ ticketsRepository, commentsRepository, storageService }) {
     this.ticketsRepository = ticketsRepository;
     this.commentsRepository = commentsRepository;
+    this.storageService = storageService;
   }
 
   async execute({ ticketId, user }) {
@@ -20,6 +21,6 @@ export class ListComments {
     }
 
     const comments = await this.commentsRepository.findByTicketId(ticketId);
-    return CommentMapper.toDTOList(comments);
+    return CommentMapper.toDTOList(comments, { storageService: this.storageService });
   }
 }

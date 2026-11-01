@@ -78,6 +78,7 @@ describe('Prisma repositories', () => {
     const { PrismaTicketsRepository } = await import('../../../src/infrastructure/database/prisma/repositories/prisma-tickets-repository.js');
     const { PrismaCommentsRepository } = await import('../../../src/infrastructure/database/prisma/repositories/prisma-comments-repository.js');
     const { PrismaTicketEventsRepository } = await import('../../../src/infrastructure/database/prisma/repositories/prisma-ticket-events-repository.js');
+    const { PrismaNotificationsRepository } = await import('../../../src/infrastructure/database/prisma/repositories/prisma-notifications-repository.js');
 
     const rawCategory = { id: 'c-1', name: 'Software', description: 'Desc', active: true, createdAt: new Date(), updatedAt: new Date() };
     const rawTicket = {
@@ -116,10 +117,22 @@ describe('Prisma repositories', () => {
       comment: {
         create: vi.fn().mockResolvedValue(rawComment),
         findMany: vi.fn().mockResolvedValue([rawComment]),
+        findUnique: vi.fn().mockResolvedValue(rawComment),
       },
       ticketEvent: {
         create: vi.fn().mockResolvedValue(rawEvent),
         findMany: vi.fn().mockResolvedValue([rawEvent]),
+      },
+      notification: {
+        create: vi.fn().mockResolvedValue({
+          id: 'notification-1',
+          userId: 'u-1',
+          type: 'NEW_COMMENT',
+          channel: 'IN_APP',
+          status: 'DELIVERED',
+          deliveredAt: new Date(),
+        }),
+        createMany: vi.fn().mockResolvedValue({ count: 2 }),
       },
     };
 
@@ -127,6 +140,7 @@ describe('Prisma repositories', () => {
     const ticketsRepo = new PrismaTicketsRepository(prisma);
     const commentsRepo = new PrismaCommentsRepository(prisma);
     const eventsRepo = new PrismaTicketEventsRepository(prisma);
+    const notificationsRepo = new PrismaNotificationsRepository(prisma);
 
     expect((await categoriesRepo.findById('c-1')).name).toBe('Software');
     expect((await categoriesRepo.findByName('Software')).id).toBe('c-1');
@@ -167,8 +181,29 @@ describe('Prisma repositories', () => {
 
     expect((await commentsRepo.create({ ticketId: 't-1', userId: 'u-1', content: 'Msg' })).id).toBe('com-1');
     expect(await commentsRepo.findByTicketId('t-1')).toHaveLength(1);
+    expect((await commentsRepo.findById('com-1')).id).toBe('com-1');
 
     expect((await eventsRepo.create({ ticketId: 't-1', userId: 'u-1', type: 'CREATED' })).id).toBe('ev-1');
     expect(await eventsRepo.findByTicketId('t-1')).toHaveLength(1);
+
+    await notificationsRepo.createMany([
+      {
+        userId: 'u-1',
+        ticketId: 't-1',
+        type: 'NEW_COMMENT',
+        channel: 'IN_APP',
+        status: 'DELIVERED',
+      },
+      {
+        userId: 'u-1',
+        ticketId: 't-1',
+        type: 'NEW_COMMENT',
+        channel: 'EMAIL',
+        status: 'PENDING',
+      },
+    ]);
+    const notificationCreateManyData = prisma.notification.createMany.mock.calls[0][0].data;
+    expect(notificationCreateManyData[0].deliveredAt).toBeInstanceOf(Date);
+    expect(notificationCreateManyData[1].deliveredAt).toBeNull();
   });
 });

@@ -7,6 +7,7 @@ export class Comment {
     createdAt = new Date(),
     updatedAt = new Date(),
     user = null,
+    attachments = [],
   }) {
     this.id = id;
     this.ticketId = ticketId;
@@ -15,5 +16,6 @@ export class Comment {
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.user = user;
+    this.attachments = attachments;
   }
 }

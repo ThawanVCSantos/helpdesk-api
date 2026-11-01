@@ -2,13 +2,15 @@ import { BadRequestError } from '../../../domain/errors/bad-request-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { VALID_STATUSES, calculateClosedAt } from '../../../shared/utils/ticket-status.js';
+import { logger } from '../../../infrastructure/logging/logger.js';
 
 export { VALID_STATUSES };
 
 export class ChangeTicketStatus {
-  constructor({ ticketsRepository, ticketEventsRepository }) {
+  constructor({ ticketsRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
     this.ticketsRepository = ticketsRepository;
     this.ticketEventsRepository = ticketEventsRepository;
+    this.dispatchTicketNotifications = dispatchTicketNotifications;
   }
 
   async execute({ id, actorUser, status }) {
@@ -41,6 +43,23 @@ export class ChangeTicketStatus {
         newStatus: status,
       },
     });
+
+    if (this.dispatchTicketNotifications) {
+      try {
+        await this.dispatchTicketNotifications.execute({
+          ticket: updated,
+          actorUserId: actorUser.id,
+          type: 'STATUS_CHANGED',
+        });
+      } catch (error) {
+        logger.error('Failed to dispatch ticket notifications', {
+          ticketId: id,
+          actorUserId: actorUser.id,
+          type: 'STATUS_CHANGED',
+          error: error.message,
+        });
+      }
+    }
 
     return TicketMapper.toDTO(updated);
   }

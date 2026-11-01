@@ -654,6 +654,27 @@ paths:
           description: Permissão negada
         '404':
           description: Chamado não encontrado
+  /tickets/comments/{id}:
+    get:
+      tags:
+        - Comentários
+      summary: Obter um comentário por ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Comentário com seus anexos
+        '403':
+          description: Permissão negada
+        '404':
+          description: Comentário ou chamado associado não encontrado
   /tickets/{ticketId}/events:
     get:
       tags:
@@ -675,6 +696,197 @@ paths:
           description: Permissão negada
         '404':
           description: Chamado não encontrado
+  /attachments/tickets/{ticketId}:
+    post:
+      tags:
+        - Anexos
+      summary: Enviar anexo para um chamado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Arquivo enviado com sucesso e armazenado no Cloudinary
+        '400':
+          description: Arquivo ausente ou chamado encerrado
+        '403':
+          description: Permissão negada
+        '404':
+          description: Chamado não encontrado
+    get:
+      tags:
+        - Anexos
+      summary: Listar anexos de um chamado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de anexos do chamado com URLs seguras
+  /attachments/comments/{commentId}:
+    post:
+      tags:
+        - Anexos
+      summary: Enviar anexo para um comentário (Cloudinary)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Arquivo enviado com sucesso
+        '400':
+          description: Arquivo ausente ou chamado encerrado
+    get:
+      tags:
+        - Anexos
+      summary: Listar anexos de um comentário
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: commentId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Lista de anexos do comentário com URLs seguras
+        '403':
+          description: Permissão negada
+        '404':
+          description: Comentário ou chamado associado não encontrado
+  /attachments/{id}:
+    delete:
+      tags:
+        - Anexos
+      summary: Excluir um anexo
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Anexo removido com sucesso
+        '403':
+          description: Permissão negada
+        '404':
+          description: Anexo não encontrado
+  /notifications:
+    get:
+      tags:
+        - Notificações
+      summary: Listar notificações do usuário autenticado
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            default: 20
+        - in: query
+          name: unreadOnly
+          schema:
+            type: boolean
+        - in: query
+          name: channel
+          schema:
+            type: string
+            enum: [IN_APP, EMAIL]
+            default: IN_APP
+      responses:
+        '200':
+          description: Lista paginada de notificações com contador de não lidas
+  /notifications/{id}/read:
+    patch:
+      tags:
+        - Notificações
+      summary: Marcar notificação como lida
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notificação marcada como lida
+        '404':
+          description: Notificação não encontrada
+  /notifications/read-all:
+    patch:
+      tags:
+        - Notificações
+      summary: Marcar todas as notificações do usuário como lidas
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Quantidade de notificações atualizadas
+  /notifications/trigger-job:
+    post:
+      tags:
+        - Notificações
+      summary: Executar imediatamente lote de envio de e-mails com retry (Admin)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Resultado do processamento do lote
 components:
   securitySchemes:
     BearerAuth:
@@ -761,6 +973,11 @@ components:
         - $ref: '#/components/schemas/TicketSummary'
         - type: object
           properties:
+            attachments:
+              type: array
+              description: Anexos diretamente associados ao chamado
+              items:
+                $ref: '#/components/schemas/Attachment'
             comments:
               type: array
               description: Lista cronológica de comentários do chamado
@@ -777,6 +994,10 @@ components:
                     format: date-time
                   user:
                     $ref: '#/components/schemas/UserSummary'
+                  attachments:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Attachment'
             events:
               type: array
               description: Linha do tempo de eventos de auditoria do chamado
@@ -795,3 +1016,22 @@ components:
                     format: date-time
                   user:
                     $ref: '#/components/schemas/UserSummary'
+    Attachment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        size:
+          type: integer
+          format: int64
+        url:
+          type: string
+          format: uri
+        createdAt:
+          type: string
+          format: date-time

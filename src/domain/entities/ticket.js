@@ -17,6 +17,7 @@ export class Ticket {
     category = null,
     comments = [],
     events = [],
+    attachments = [],
   }) {
     this.id = id;
     this.title = title;
@@ -35,5 +36,6 @@ export class Ticket {
     this.category = category;
     this.comments = comments;
     this.events = events;
+    this.attachments = attachments;
   }
 }

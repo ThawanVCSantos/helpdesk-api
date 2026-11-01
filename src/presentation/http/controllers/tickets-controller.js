@@ -8,6 +8,7 @@ export class TicketsController {
     changeTicketStatusUseCase,
     createCommentUseCase,
     listCommentsUseCase,
+    getCommentByIdUseCase,
     listTicketEventsUseCase,
   }) {
     this.createTicketUseCase = createTicketUseCase;
@@ -18,6 +19,7 @@ export class TicketsController {
     this.changeTicketStatusUseCase = changeTicketStatusUseCase;
     this.createCommentUseCase = createCommentUseCase;
     this.listCommentsUseCase = listCommentsUseCase;
+    this.getCommentByIdUseCase = getCommentByIdUseCase;
     this.listTicketEventsUseCase = listTicketEventsUseCase;
   }
 
@@ -133,6 +135,18 @@ export class TicketsController {
         user: req.user,
       });
       return res.status(200).json(comments);
+    } catch (error) {
+      return next(error);
+    }
+  };
+
+  getCommentById = async (req, res, next) => {
+    try {
+      const comment = await this.getCommentByIdUseCase.execute({
+        id: req.params.id,
+        user: req.user,
+      });
+      return res.status(200).json(comment);
     } catch (error) {
       return next(error);
     }
