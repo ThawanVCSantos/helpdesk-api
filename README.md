@@ -13,11 +13,13 @@
 
 ### Inicialização
 
-1. Copie o arquivo `.env.example` para `.env` e configure as credenciais do PostgreSQL e do administrador inicial.
+1. Copie o arquivo `.env.example` para `.env` e configure as credenciais do PostgreSQL e do administrador inicial. Para executar com Docker Compose, mantenha `DATABASE_HOST=postgres` e `DATABASE_PORT=5432`, que são o nome e a porta do PostgreSQL dentro da rede Docker. A variável `POSTGRES_EXPOSED_PORT` controla apenas a porta opcional publicada no host.
 
 ```bash
    cp .env.example .env
 ```
+
+Se a API ou os scripts forem executados diretamente no host, use `DATABASE_HOST=localhost` e a porta definida em `POSTGRES_EXPOSED_PORT` em vez dos valores internos do Docker.
 
 2. Inicie os serviços construindo as imagens:
 
@@ -33,6 +35,20 @@ A especificação completa de todos os endpoints da API (métodos HTTP, caminhos
 
 - **URL de acesso:** [http://localhost:3000/docs](http://localhost:3000/docs)
 - **Arquivo de especificação OpenAPI:** localizado em [`docs/openapi.yaml`](docs/openapi.yaml)
+
+### Collection do Postman
+
+A collection para avaliação está em [`postman/helpdesk-api.postman_collection.json`](postman/helpdesk-api.postman_collection.json).
+
+Para utilizá-la:
+
+1. Inicie a API e importe o arquivo no Postman (`Import > File`).
+2. Na collection, ajuste `baseUrl` caso a API não esteja em `http://localhost:3000`.
+3. Configure `email` e `password` com as credenciais do administrador definidas no `.env`.
+4. Execute `Health` e depois `Login`; o script do login armazena automaticamente o JWT em `access_token`.
+5. Preencha `categoryId`, `ticketId`, `commentId`, `userId`, `notificationId` e `attachmentId` com os IDs retornados pelas requisições. Para uploads, abra a requisição correspondente, acesse `Body > form-data` e selecione o arquivo diretamente no campo `file`. O token de recuperação deve ser preenchido em `resetToken` a partir do e-mail recebido.
+
+As requisições estão agrupadas por recurso e cobrem todos os endpoints publicados pela API, inclusive autenticação, recuperação de senha, upload de anexos e execução do job de notificações. Os scripts da collection preenchem automaticamente os IDs de usuário, categoria, chamado, comentário e anexo após as operações de criação; `notificationId` e `resetToken` devem ser informados quando necessários.
 
 ### Testes e Verificação de Qualidade
 
@@ -90,7 +106,7 @@ A partir dele, outras entidades estarão relacionadas para representar o process
 - eventos que registram ações relevantes realizadas nos chamados;
 - tokens utilizados nos processos de ativação de usuários, definição inicial de senha e recuperação de senha.
 
-O modelo inclui notificações associadas a usuários e chamados. A entrega real de e-mails e demais integrações será incorporada conforme a evolução do projeto.
+O modelo inclui notificações associadas a usuários e chamados. A aplicação entrega notificações internas e processa notificações por e-mail em segundo plano por SMTP, com retentativas configuráveis.
 
 ## Perfis de usuário
 
@@ -349,7 +365,7 @@ Principais atributos:
 - `readAt` — instante em que o usuário leu a notificação interna
 - `createdAt` e `updatedAt`
 
-Cada registro representa um destinatário e canal. Notificações internas aparecem na caixa do usuário; e-mails ficam pendentes para integração futura. O conteúdo é montado pela aplicação quando necessário.
+Cada registro representa um destinatário e canal. Notificações internas aparecem na caixa do usuário; notificações por e-mail são processadas pelo worker em segundo plano. O conteúdo é montado pela aplicação quando necessário.
 
 ## Relacionamentos
 
@@ -503,7 +519,7 @@ erDiagram
     tickets o|--o{ notifications : relates
 ```
 
-## Regras de negócio iniciais
+## Regras de negócio
 
 1. Todo usuário deverá possuir pelo menos um papel de acesso.
 
@@ -559,7 +575,8 @@ erDiagram
 27. A API deverá retornar respostas HTTP coerentes com erros de validação, autenticação, autorização, conflito e recurso não encontrado.
 
 28. Chamados encerrados deverão ter `closedAt`; a aplicação deverá preservar eventos de auditoria, sem exclusão em cascata dos registros históricos.
-## Funcionalidades planejadas
+
+## Funcionalidades implementadas
 
 ### Autenticação e segurança
 
@@ -591,7 +608,6 @@ O sistema não terá cadastro público. O primeiro administrador será criado po
 
 - Adição de comentários.
 - Consulta de comentários de um chamado.
-- Edição quando permitida pelas regras de negócio.
 - Associação de anexos.
 
 ### Anexos
@@ -624,13 +640,42 @@ Possíveis notificações:
 - chamado próximo do vencimento;
 - chamado atrasado.
 
-Cada notificação pertence a um destinatário e canal. A caixa interna e a futura fila de e-mails compartilham o registro, mas mantêm estado de leitura separado do estado de entrega.
+Cada notificação pertence a um destinatário e canal. A caixa interna e o processamento de e-mails compartilham o registro, mas mantêm estado de leitura separado do estado de entrega.
+
+## Operações de domínio e exceções ao CRUD
+
+As operações abaixo não possuem exclusão física porque os registros participam do histórico do atendimento:
+
+- **Usuários:** são desativados com `PATCH /users/{id}/active`. O registro é preservado porque pode ser solicitante, responsável, autor de comentário ou autor de evento de auditoria.
+- **Categorias:** podem ser desativadas com `PUT /categories/{id}`. A exclusão física poderia quebrar a classificação dos chamados existentes.
+- **Chamados:** não são excluídos depois de criados. O atendimento é encerrado com `PATCH /tickets/{id}/status`, preservando seus eventos, comentários e vínculos.
+- **Comentários:** são imutáveis após a criação porque representam a comunicação registrada no chamado. Para corrigir ou complementar uma informação, o usuário deve publicar um novo comentário.
+- **Eventos de auditoria:** são preservados e não possuem exclusão.
+- **Notificações:** não são excluídas; podem ser marcadas como lidas individualmente ou em lote por meio de `PATCH /notifications/{id}/read` e `PATCH /notifications/read-all`.
+
+Os anexos são a exceção: possuem exclusão própria em `DELETE /attachments/{id}`, condicionada à autorização do usuário e ao estado do chamado. As demais entidades possuem criação, consulta e atualização quando essas operações fazem sentido para o domínio.
 
 ## API externa
 
 O projeto utiliza o **Cloudinary** como serviço externo de armazenamento e gerenciamento dos arquivos enviados como anexos em chamados e comentários.
 
 Nesse cenário, o sistema é responsável por controlar os metadados e relacionamentos dos anexos (persisti-los via Prisma no PostgreSQL), enquanto o upload seguro, processamento e entrega de mídia são delegados à API do Cloudinary.
+
+### Configuração do Cloudinary
+
+1. Crie uma conta no [Cloudinary](https://cloudinary.com/) e acesse o **Dashboard**.
+2. Copie os valores `Cloud name`, `API Key` e `API Secret` para `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` e `CLOUDINARY_API_SECRET`.
+3. Mantenha `CLOUDINARY_FOLDER` com o diretório lógico desejado. Não é necessário criar manualmente um upload preset: a aplicação utiliza upload assinado pela API.
+4. Configure `MAX_FILE_SIZE_MB` conforme o limite de arquivos desejado e valide o fluxo usando as requisições de upload da collection.
+
+### Configuração do SMTP
+
+O SMTP é necessário para recuperação de senha, definição da senha inicial de novos usuários e notificações por e-mail.
+
+1. Configure uma conta SMTP de teste ou de uso da aplicação.
+2. Preencha `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_SECURE` e `MAIL_FROM` no `.env`.
+3. Ao utilizar Gmail, prefira uma senha de aplicativo em vez da senha principal da conta.
+4. Para testar o envio de notificações pendentes, utilize `POST /notifications/trigger-job` com um token de administrador. O scheduler também executa o processamento conforme `NOTIFICATION_CRON_SCHEDULE`.
 
 ## Tecnologias
 
@@ -654,8 +699,8 @@ As entidades do sistema utilizam **UUIDs** como identificadores padronizados.
 
 ## Status do projeto
 
-**Operações de CRUD e Integração Funcional Concluídas**
+**Operações de domínio e integração funcional concluídas**
 
-- CRUD completo de Usuários, Sessões/Autenticação, Categorias, Chamados, Comentários, Histórico/Eventos de Auditoria, Anexos e Notificações.
+- Operações de criação, consulta e atualização disponíveis conforme as regras de negócio; exclusões físicas são restritas aos anexos.
 - Integração funcional com o Cloudinary para upload e deleção de anexos.
 - Notificações internas (`IN_APP`) com controle de leitura e notificações por e-mail (`EMAIL`) com worker em segundo plano, retentativa automática configurável (máximo de 10 tentativas) e templates Handlebars.

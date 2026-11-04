@@ -17,3 +17,9 @@ export const getNotificationByIdSchema = z.object({
     id: z.string().uuid(),
   }),
 });
+
+export const markAllNotificationsAsReadSchema = z.object({
+  body: z.object({
+    channel: z.enum(['IN_APP', 'EMAIL']).default('IN_APP'),
+  }).default({}),
+});

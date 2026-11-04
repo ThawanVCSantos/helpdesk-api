@@ -1,0 +1,334 @@
+{
+  "info": {
+    "_postman_id": "c0f7d8f6-8f72-4a2d-b1ef-6f9e1d1b3d20",
+    "name": "Help Desk API",
+    "description": "Collection compatível com a versão final da API, organizada por recurso. Consulte o README para as credenciais e configurações locais.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "email", "value": "admin@admin.com" },
+    { "key": "password", "value": "CHANGE_ME" },
+    { "key": "access_token", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "categoryId", "value": "" },
+    { "key": "ticketId", "value": "" },
+    { "key": "commentId", "value": "" },
+    { "key": "attachmentId", "value": "" },
+    { "key": "notificationId", "value": "" },
+    { "key": "assignedUserId", "value": "" },
+    { "key": "resetToken", "value": "" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      { "key": "token", "value": "{{access_token}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health e autenticação",
+      "item": [
+        {
+          "name": "Health",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/health" }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const body = pm.response.json();",
+                  "  pm.collectionVariables.set('access_token', body.token || body.accessToken);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}" },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Meu perfil",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/auth/me" }
+        },
+        {
+          "name": "Solicitar recuperação de senha",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"email\": \"{{email}}\"\n}" },
+            "url": "{{baseUrl}}/auth/forgot-password"
+          }
+        },
+        {
+          "name": "Redefinir senha",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"token\": \"{{resetToken}}\",\n  \"password\": \"CHANGE_ME_NEW_PASSWORD\"\n}" },
+            "url": "{{baseUrl}}/auth/reset-password"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Usuários (Admin)",
+      "item": [
+        {
+          "name": "Criar usuário",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) {", "  const id = pm.response.json().id;", "  pm.collectionVariables.set('userId', id);", "  pm.collectionVariables.set('assignedUserId', id);", "}"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Usuário de teste\",\n  \"email\": \"user@example.com\",\n  \"roles\": [\"USER\"]\n}" },
+            "url": "{{baseUrl}}/users"
+          }
+        },
+        {
+          "name": "Listar usuários",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users?page=1&limit=20&active=true&search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["users"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "20" },
+                { "key": "active", "value": "true" },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obter usuário",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/users/{{userId}}" }
+        },
+        {
+          "name": "Atualizar usuário",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Usuário atualizado\",\n  \"roles\": [\"USER\"]\n}" },
+            "url": "{{baseUrl}}/users/{{userId}}"
+          }
+        },
+        {
+          "name": "Ativar ou desativar usuário",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"active\": true\n}" },
+            "url": "{{baseUrl}}/users/{{userId}}/active"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Categorias",
+      "item": [
+        {
+          "name": "Listar categorias",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/categories?active=true&search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["categories"],
+              "query": [
+                { "key": "active", "value": "true" },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Criar categoria",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('categoryId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"name\": \"Redes e conectividade\",\n  \"description\": \"Problemas de rede e Wi-Fi\",\n  \"active\": true\n}" },
+            "url": "{{baseUrl}}/categories"
+          }
+        },
+        {
+          "name": "Obter categoria",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/categories/{{categoryId}}" }
+        },
+        {
+          "name": "Atualizar categoria",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"description\": \"Categoria atualizada\",\n  \"active\": true\n}" },
+            "url": "{{baseUrl}}/categories/{{categoryId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Chamados, comentários e histórico",
+      "item": [
+        {
+          "name": "Criar chamado",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('ticketId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Computador não liga\",\n  \"description\": \"O equipamento não responde ao botão de energia.\",\n  \"priority\": \"MEDIUM\",\n  \"categoryId\": \"{{categoryId}}\",\n  \"dueDate\": null\n}" },
+            "url": "{{baseUrl}}/tickets"
+          }
+        },
+        {
+          "name": "Listar chamados",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/tickets?page=1&limit=10&status=OPEN&priority=MEDIUM&categoryId=&requesterId=&assignedUserId=&search=",
+              "host": ["{{baseUrl}}"],
+              "path": ["tickets"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "10" },
+                { "key": "status", "value": "OPEN", "disabled": true },
+                { "key": "priority", "value": "MEDIUM", "disabled": true },
+                { "key": "categoryId", "value": "", "disabled": true },
+                { "key": "requesterId", "value": "", "disabled": true },
+                { "key": "assignedUserId", "value": "", "disabled": true },
+                { "key": "search", "value": "", "disabled": true }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Obter chamado",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/tickets/{{ticketId}}" }
+        },
+        {
+          "name": "Atualizar chamado",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"title\": \"Computador não liga - atualizado\",\n  \"priority\": \"HIGH\"\n}" },
+            "url": "{{baseUrl}}/tickets/{{ticketId}}"
+          }
+        },
+        {
+          "name": "Atribuir ou remover responsável",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"assignedUserId\": \"{{assignedUserId}}\"\n}" },
+            "url": "{{baseUrl}}/tickets/{{ticketId}}/assign"
+          }
+        },
+        {
+          "name": "Alterar status",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"status\": \"IN_PROGRESS\"\n}" },
+            "url": "{{baseUrl}}/tickets/{{ticketId}}/status"
+          }
+        },
+        {
+          "name": "Listar comentários",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/tickets/{{ticketId}}/comments" }
+        },
+        {
+          "name": "Adicionar comentário",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('commentId', pm.response.json().id);"] } }],
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"content\": \"Iniciei a análise do chamado.\"\n}" },
+            "url": "{{baseUrl}}/tickets/{{ticketId}}/comments"
+          }
+        },
+        {
+          "name": "Obter comentário",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/tickets/comments/{{commentId}}" }
+        },
+        {
+          "name": "Listar eventos do chamado",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/tickets/{{ticketId}}/events" }
+        }
+      ]
+    },
+    {
+      "name": "Anexos",
+      "item": [
+        {
+          "name": "Enviar anexo para chamado",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('attachmentId', pm.response.json().data.id);"] } }],
+          "request": {
+            "method": "POST",
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file" }] },
+            "url": "{{baseUrl}}/attachments/tickets/{{ticketId}}"
+          }
+        },
+        {
+          "name": "Listar anexos do chamado",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/attachments/tickets/{{ticketId}}" }
+        },
+        {
+          "name": "Enviar anexo para comentário",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": ["if (pm.response.code === 201) pm.collectionVariables.set('attachmentId', pm.response.json().data.id);"] } }],
+          "request": {
+            "method": "POST",
+            "body": { "mode": "formdata", "formdata": [{ "key": "file", "type": "file" }] },
+            "url": "{{baseUrl}}/attachments/comments/{{commentId}}"
+          }
+        },
+        {
+          "name": "Listar anexos do comentário",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/attachments/comments/{{commentId}}" }
+        },
+        {
+          "name": "Excluir anexo",
+          "request": { "method": "DELETE", "header": [], "url": "{{baseUrl}}/attachments/{{attachmentId}}" }
+        }
+      ]
+    },
+    {
+      "name": "Notificações",
+      "item": [
+        {
+          "name": "Listar minhas notificações",
+          "request": { "method": "GET", "header": [], "url": "{{baseUrl}}/notifications?page=1&limit=20&unreadOnly=false&channel=IN_APP" }
+        },
+        {
+          "name": "Marcar notificação como lida",
+          "request": { "method": "PATCH", "header": [], "url": "{{baseUrl}}/notifications/{{notificationId}}/read" }
+        },
+        {
+          "name": "Marcar todas como lidas",
+          "request": {
+            "method": "PATCH",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "raw": "{\n  \"channel\": \"IN_APP\"\n}" },
+            "url": "{{baseUrl}}/notifications/read-all"
+          }
+        },
+        {
+          "name": "Executar job de notificações (Admin)",
+          "request": { "method": "POST", "header": [], "url": "{{baseUrl}}/notifications/trigger-job" }
+        }
+      ]
+    }
+  ]
+}

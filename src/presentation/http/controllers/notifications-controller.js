@@ -56,7 +56,7 @@ export class NotificationsController {
   markAllAsRead = async (req, res, next) => {
     try {
       const user = req.user;
-      const { channel } = req.body || {};
+      const { channel } = req.validated?.body || req.body || {};
 
       const result = await this.markAllNotificationsAsRead.execute({
         user,

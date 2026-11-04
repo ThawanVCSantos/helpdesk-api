@@ -6,6 +6,7 @@ import { validateSchema } from '../middlewares/validate-schema.js';
 import {
   listNotificationsSchema,
   getNotificationByIdSchema,
+  markAllNotificationsAsReadSchema,
 } from '../validators/notifications/notification-schemas.js';
 
 export const notificationsRouter = Router();
@@ -17,6 +18,7 @@ notificationsRouter.get('/', validateSchema(listNotificationsSchema), notificati
 
 notificationsRouter.patch(
   '/read-all',
+  validateSchema(markAllNotificationsAsReadSchema),
   notificationsController.markAllAsRead
 );
 
