@@ -73,6 +73,13 @@ cobertura mínima de 70% antes de cada commit. O hook é instalado pelo script
 bun run prepare
 ```
 
+### Infraestrutura e CI/CD
+
+As decisões de infraestrutura, o fluxo de CI/CD, a estratégia de branches,
+as verificações de segurança e as instruções de configuração dos serviços
+externos estão documentados no
+[README-INFRA.md](README-INFRA.md).
+
 ### Inicialização do banco de dados
 
 O Docker Compose inicia o PostgreSQL 18, aplica as migrations pendentes e executa o seed inicial definido em `prisma/seed.js`.
