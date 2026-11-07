@@ -42,6 +42,7 @@ COPY prisma.config.js ./
 COPY scripts/start.sh ./scripts/start.sh
 COPY src ./src
 COPY docs ./docs
+RUN chown -R bun:bun /app
 USER bun
 EXPOSE 3000
 CMD ["sh", "./scripts/start.sh"]
