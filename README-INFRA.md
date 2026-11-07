@@ -81,7 +81,7 @@ O [`Dockerfile`](./Dockerfile) é estruturado em estágios isolados para minimiz
 
 ### 2.4. Gestão de Segredos e Isolamento de Credenciais
 * Nenhum dado sensível ou variável de ambiente com credenciais é persistido no repositório Git ou incorporado nas camadas da imagem Docker (`ARG` ou `ENV`).
-* Variáveis de ambiente (`DATABASE_URL`, `JWT_SECRET`, tokens de mensageria) são injetadas estritamente em tempo de execução pelo provedor de hospedagem e pelo Docker Compose local.
+* Variáveis de ambiente (`DATABASE_HOST`, `DATABASE_PASSWORD`, `JWT_SECRET`, tokens de mensageria) são injetadas estritamente em tempo de execução pelo provedor de hospedagem e pelo Docker Compose local.
 * Senhas de usuários utilizam criptografia derivativa de alta resistência via algoritmo **Argon2id**, e tokens de recuperação de conta são persistidos exclusivamente sob hash unidirecional.
 
 ---
@@ -130,15 +130,25 @@ gitGraph
 
 ---
 
-## 5. Orquestração e Inicialização do Banco de Dados em Produção
+## 5. Orquestração e Inicialização do Banco de Dados
 
-O banco de dados relacional (PostgreSQL) opera como serviço gerenciado em nuvem, garantindo isolamento da camada de persistência.
+A arquitetura adota estratégias complementares para a execução de migrations e seeds, respeitando as particularidades de cada ambiente:
 
-Para assegurar a integridade do schema sem depender de processos manuais de migração em tempo de deploy, o container da aplicação é orquestrado para executar as rotinas de schema e carga inicial de forma síncrona na subida:
+### 5.1. Ambiente Local (Docker Compose)
+No ambiente de desenvolvimento local (`docker-compose.yml`), a orquestração aproveita o estágio dedicado **`migrator`** do multi-stage build:
+* O serviço `migrate` sobe isolado, aguarda a saúde do container do PostgreSQL (`condition: service_healthy`), executa `bunx prisma migrate deploy` e `bunx prisma db seed`, e é encerrado com código de saída 0.
+* O serviço `api` (estágio `runtime`) depende estritamente do sucesso prévio do migrator (`condition: service_completed_successfully`), garantindo separação limpa de responsabilidades entre tarefas de migração e o servidor HTTP.
+
+### 5.2. Ambiente de Produção em Nuvem (Render)
+Em plataformas PaaS em nuvem sem suporte a orquestração multi-container no plano gratuito, a inicialização é coordenada de forma autônoma e segura pelo script de entrada do container ([`scripts/start.sh`](./scripts/start.sh)):
 ```bash
-sh -c "bunx prisma migrate deploy && bunx prisma db seed && bun src/index.js"
+#!/bin/sh
+set -e
+bun run db:deploy
+bun run db:seed
+exec bun run start
 ```
-* **`prisma migrate deploy`:** Avalia o estado do banco e aplica pendências de migration de forma transacional.
-* **`prisma db seed`:** Executa rotinas idempotentes de carga inicial (criação de roles `USER`, `AGENT`, `ADMIN`, categorias padrão e provisionamento do administrador do sistema caso inexistente).
-* **`bun src/index.js`:** Inicializa o servidor HTTP na porta parametrizada após a confirmação do estado íntegro do banco de dados.
+* **`bun run db:deploy` (`prisma migrate deploy`):** Avalia o PostgreSQL gerenciado do Render e aplica migrations pendentes de forma atômica e idempotente.
+* **`bun run db:seed` (`prisma db seed`):** Executa rotinas idempotentes de carga inicial (criação de roles `USER`, `AGENT`, `ADMIN`, categorias padrão e provisionamento do administrador do sistema caso inexistente).
+* **`bun run start` (`bun src/index.js`):** Inicializa o servidor HTTP na porta parametrizada após a confirmação do estado íntegro do schema e dos dados essenciais.
 * **Monitoramento Contínuo:** O endpoint `/health` é sondado periodicamente pelo mecanismo de health check da infraestrutura para validação de integridade operacional.
