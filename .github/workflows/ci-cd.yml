@@ -47,7 +47,7 @@ jobs:
         run: bun run test:coverage
 
       - name: Armazenar relatório de cobertura (LCOV)
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage/lcov.info
@@ -85,7 +85,7 @@ jobs:
           fetch-depth: 0
 
       - name: Baixar relatório de cobertura
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v8
         with:
           name: coverage-report
           path: coverage
