@@ -33,13 +33,15 @@ FROM oven/bun:1.3.3-debian AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
 COPY package.json ./
 COPY prisma ./prisma
 COPY prisma.config.js ./
+COPY scripts/start.sh ./scripts/start.sh
 COPY src ./src
 COPY docs ./docs
 USER bun
 EXPOSE 3000
-CMD ["bun", "src/index.js"]
+CMD ["sh", "./scripts/start.sh"]
