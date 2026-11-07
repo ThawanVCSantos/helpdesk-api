@@ -65,6 +65,14 @@ As requisições estão agrupadas por recurso e cobrem todos os endpoints public
   bun run lint
   ```
 
+O projeto usa o Lefthook para executar automaticamente o lint e os testes com
+cobertura mínima de 70% antes de cada commit. O hook é instalado pelo script
+`prepare` durante a instalação das dependências. Para reinstalá-lo manualmente:
+
+```bash
+bun run prepare
+```
+
 ### Inicialização do banco de dados
 
 O Docker Compose inicia o PostgreSQL 18, aplica as migrations pendentes e executa o seed inicial definido em `prisma/seed.js`.
