@@ -1,7 +1,7 @@
 FROM oven/bun:1.3.3-debian AS dependencies
 WORKDIR /app
 ENV LEFTHOOK=0
-RUN apt-get update -y && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
+RUN apt-get update -y && apt-get install -y --no-install-recommends openssl && rm -rf /var/lib/apt/lists/*
 COPY package.json bun.lock ./
 COPY scripts/prepare.js ./scripts/prepare.js
 RUN bun install --frozen-lockfile
@@ -18,7 +18,7 @@ COPY prisma.config.js ./
 COPY prisma ./prisma
 COPY src ./src
 RUN bun run db:generate
-CMD ["bunx", "prisma", "migrate", "deploy"]
+CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
 
 FROM oven/bun:1.3.3-debian AS production-dependencies
 WORKDIR /app
