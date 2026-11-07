@@ -67,7 +67,7 @@ jobs:
           fetch-depth: 0
 
       - name: Executar Gitleaks para detecção de segredos
-        uses: gitleaks/gitleaks-action@v2
+        uses: gitleaks/gitleaks-action@v3
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -123,7 +123,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Executar varredura de vulnerabilidades com Trivy
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-temp
           format: 'table'
