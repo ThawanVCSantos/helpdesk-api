@@ -1,0 +1,207 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: thawanvcsantos/helpdesk-api
+
+jobs:
+  # =========================================================================
+  # ETAPA 1: Lint e Testes Automatizados com Cobertura
+  # =========================================================================
+  lint-and-tests:
+    name: 1. Lint e Testes
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.3
+
+      - name: Instalar dependências
+        run: bun install --frozen-lockfile
+
+      - name: Gerar Client do Prisma
+        run: bun run db:generate
+
+      - name: Executar Lint (ESLint)
+        run: bun run lint
+
+      - name: Executar Testes Unitários e de Integração com Cobertura
+        env:
+          DATABASE_PASSWORD: test_ci_password
+        run: bun run test:coverage
+
+      - name: Armazenar relatório de cobertura (LCOV)
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/lcov.info
+          retention-days: 1
+
+  # =========================================================================
+  # ETAPA 2: Análise de Segredos (Secret Scanning)
+  # =========================================================================
+  secret-scanning:
+    name: 2. Análise de Segredos
+    runs-on: ubuntu-latest
+    needs: lint-and-tests
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Executar Gitleaks para detecção de segredos
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # =========================================================================
+  # ETAPA 3: Análise de Qualidade de Código (SonarQube / SonarCloud)
+  # =========================================================================
+  sonar-quality-gate:
+    name: 3. Análise de Qualidade (SonarQube)
+    runs-on: ubuntu-latest
+    needs: secret-scanning
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Baixar relatório de cobertura
+        uses: actions/download-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info
+
+  # =========================================================================
+  # ETAPA 4: Segurança de Containers (Varredura com Trivy)
+  # =========================================================================
+  container-security:
+    name: 4. Segurança de Containers (Trivy)
+    runs-on: ubuntu-latest
+    needs: sonar-quality-gate
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Construir imagem Docker local para teste
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-temp
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Executar varredura de vulnerabilidades com Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:scan-temp
+          format: 'table'
+          exit-code: '0' # Configurado como 0 ou 1 dependendo da tolerância a vulnerabilidades
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          severity: 'CRITICAL,HIGH'
+
+  # =========================================================================
+  # ETAPA 5: Build Otimizado e Push para o Container Registry
+  # =========================================================================
+  build-and-push:
+    name: 5. Build e Push da Imagem
+    runs-on: ubuntu-latest
+    needs: container-security
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Autenticar no GitHub Container Registry (GHCR)
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extrair metadados e tags para Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=sha,prefix=,format=short
+
+      - name: Build e Push da imagem multi-stage
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # =========================================================================
+  # ETAPA 6: Deploy Automatizado no Render
+  # =========================================================================
+  deploy-render:
+    name: 6. Deploy Automatizado no Render
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    steps:
+      - name: Disparar Deploy Hook do Render
+        env:
+          RENDER_DEPLOY_HOOK_URL: ${{ secrets.RENDER_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$RENDER_DEPLOY_HOOK_URL" ]; then
+            echo "::error::Secret RENDER_DEPLOY_HOOK_URL não configurado nos Secrets do repositório!"
+            exit 1
+          fi
+          echo "Disparando novo deploy no Render..."
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$RENDER_DEPLOY_HOOK_URL")
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          echo "Resposta do Render ($HTTP_CODE): $BODY"
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "Deploy disparado com sucesso no Render!"
+          else
+            echo "::error::Falha ao disparar deploy no Render. Código HTTP: $HTTP_CODE"
+            exit 1
+          fi
+
