@@ -4,8 +4,8 @@ info:
   description: API REST para gerenciamento de chamados de suporte de TI.
   version: 1.0.0
 servers:
-  - url: http://localhost:3000
-    description: Servidor Local
+  - url: /
+    description: Servidor atual da API
 paths:
   /health:
     get:
