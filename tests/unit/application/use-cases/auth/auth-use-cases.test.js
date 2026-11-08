@@ -5,6 +5,7 @@ import { ResetPassword } from '../../../../../src/application/use-cases/auth/res
 import { UnauthorizedError } from '../../../../../src/domain/errors/unauthorized-error.js';
 import { AppError } from '../../../../../src/domain/errors/app-error.js';
 import { UserToken } from '../../../../../src/domain/entities/user-token.js';
+import { makeTransactionRunner } from '../../../helpers/transaction-runner.js';
 
 describe('Auth Use Cases (Unit)', () => {
   describe('AuthenticateUser', () => {
@@ -104,6 +105,7 @@ describe('Auth Use Cases (Unit)', () => {
         userTokensRepository: mockUserTokensRepo,
         hashService: mockHashService,
         mailService: mockMailService,
+        transactionRunner: makeTransactionRunner({ userTokensRepository: mockUserTokensRepo }),
       });
 
       const result = await useCase.execute({ email: 'jane@test.com' });
@@ -181,6 +183,10 @@ describe('Auth Use Cases (Unit)', () => {
         userTokensRepository: mockUserTokensRepo,
         hashService: mockHashService,
         passwordHasher: mockPasswordHasher,
+        transactionRunner: makeTransactionRunner({
+          usersRepository: mockUsersRepo,
+          userTokensRepository: mockUserTokensRepo,
+        }),
       });
 
       const result = await useCase.execute({

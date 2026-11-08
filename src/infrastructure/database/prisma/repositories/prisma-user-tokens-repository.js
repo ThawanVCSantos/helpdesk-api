@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { UserTokenMapper } from '../../../../application/mappers/user-token-mapper.js';
 
-export class PrismaUserTokensRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaUserTokensRepository extends BasePrismaRepository {
   async create({ userId, token, type, expiresAt }) {
     const raw = await this.prisma.userToken.create({
       data: {

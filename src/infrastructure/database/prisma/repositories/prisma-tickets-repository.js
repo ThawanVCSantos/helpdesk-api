@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { TicketMapper } from '../../../../application/mappers/ticket-mapper.js';
 
-export class PrismaTicketsRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaTicketsRepository extends BasePrismaRepository {
   async findById(id) {
     const raw = await this.prisma.ticket.findUnique({
       where: { id },

@@ -5,6 +5,7 @@ import { PrismaCommentsRepository } from '../../../infrastructure/database/prism
 import { PrismaUsersRepository } from '../../../infrastructure/database/prisma/repositories/prisma-users-repository.js';
 import { PrismaNotificationsRepository } from '../../../infrastructure/database/prisma/repositories/prisma-notifications-repository.js';
 import { CloudinaryStorageService } from '../../../infrastructure/storage/cloudinary-storage-service.js';
+import { PrismaTransactionRunner } from '../../../infrastructure/database/prisma/prisma-transaction-runner.js';
 
 import { CreateTicket } from '../../../application/use-cases/tickets/create-ticket.js';
 import { ListTickets } from '../../../application/use-cases/tickets/list-tickets.js';
@@ -27,6 +28,7 @@ export const makeTicketsController = () => {
   const usersRepository = new PrismaUsersRepository();
   const notificationsRepository = new PrismaNotificationsRepository();
   const storageService = new CloudinaryStorageService();
+  const transactionRunner = new PrismaTransactionRunner();
 
   const dispatchTicketNotifications = new DispatchTicketNotifications({ notificationsRepository });
 
@@ -34,6 +36,7 @@ export const makeTicketsController = () => {
     ticketsRepository,
     categoriesRepository,
     ticketEventsRepository,
+    transactionRunner,
   });
 
   const listTicketsUseCase = new ListTickets({ ticketsRepository });
@@ -44,6 +47,7 @@ export const makeTicketsController = () => {
     categoriesRepository,
     ticketEventsRepository,
     dispatchTicketNotifications,
+    transactionRunner,
   });
 
   const assignTicketUseCase = new AssignTicket({
@@ -51,12 +55,14 @@ export const makeTicketsController = () => {
     usersRepository,
     ticketEventsRepository,
     dispatchTicketNotifications,
+    transactionRunner,
   });
 
   const changeTicketStatusUseCase = new ChangeTicketStatus({
     ticketsRepository,
     ticketEventsRepository,
     dispatchTicketNotifications,
+    transactionRunner,
   });
 
   const createCommentUseCase = new CreateComment({
@@ -64,6 +70,7 @@ export const makeTicketsController = () => {
     commentsRepository,
     ticketEventsRepository,
     dispatchTicketNotifications,
+    transactionRunner,
   });
 
   const listCommentsUseCase = new ListComments({

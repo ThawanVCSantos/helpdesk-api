@@ -2,15 +2,20 @@ import { BadRequestError } from '../../../domain/errors/bad-request-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { VALID_STATUSES, calculateClosedAt } from '../../../shared/utils/ticket-status.js';
-import { logger } from '../../../infrastructure/logging/logger.js';
 
 export { VALID_STATUSES };
 
 export class ChangeTicketStatus {
-  constructor({ ticketsRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
+  constructor({
+    ticketsRepository,
+    ticketEventsRepository,
+    dispatchTicketNotifications,
+    transactionRunner,
+  }) {
     this.ticketsRepository = ticketsRepository;
     this.ticketEventsRepository = ticketEventsRepository;
     this.dispatchTicketNotifications = dispatchTicketNotifications;
+    this.transactionRunner = transactionRunner;
   }
 
   async execute({ id, actorUser, status }) {
@@ -29,37 +34,32 @@ export class ChangeTicketStatus {
 
     const closedAt = calculateClosedAt(status, ticket.closedAt);
 
-    const updated = await this.ticketsRepository.update(id, {
-      status,
-      closedAt,
-    });
+    const updated = await this.transactionRunner.run(async () => {
+      const updatedTicket = await this.ticketsRepository.update(id, {
+        status,
+        closedAt,
+      });
 
-    await this.ticketEventsRepository.create({
-      ticketId: id,
-      userId: actorUser.id,
-      type: 'STATUS_CHANGED',
-      metadata: {
-        oldStatus: ticket.status,
-        newStatus: status,
-      },
-    });
+      await this.ticketEventsRepository.create({
+        ticketId: id,
+        userId: actorUser.id,
+        type: 'STATUS_CHANGED',
+        metadata: {
+          oldStatus: ticket.status,
+          newStatus: status,
+        },
+      });
 
-    if (this.dispatchTicketNotifications) {
-      try {
+      if (this.dispatchTicketNotifications) {
         await this.dispatchTicketNotifications.execute({
-          ticket: updated,
+          ticket: updatedTicket,
           actorUserId: actorUser.id,
           type: 'STATUS_CHANGED',
-        });
-      } catch (error) {
-        logger.error('Failed to dispatch ticket notifications', {
-          ticketId: id,
-          actorUserId: actorUser.id,
-          type: 'STATUS_CHANGED',
-          error: error.message,
         });
       }
-    }
+
+      return updatedTicket;
+    });
 
     return TicketMapper.toDTO(updated);
   }

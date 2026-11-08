@@ -132,15 +132,10 @@ gitGraph
 
 ## 5. Orquestração e Inicialização do Banco de Dados
 
-A arquitetura adota estratégias complementares para a execução de migrations e seeds, respeitando as particularidades de cada ambiente:
+A arquitetura adota uma estratégia unificada e autônoma para a execução de migrations e seeds, garantindo paridade total entre os ambientes local (Docker Compose) e de produção (Render):
 
-### 5.1. Ambiente Local (Docker Compose)
-No ambiente de desenvolvimento local (`docker-compose.yml`), a orquestração aproveita o estágio dedicado **`migrator`** do multi-stage build:
-* O serviço `migrate` sobe isolado, aguarda a saúde do container do PostgreSQL (`condition: service_healthy`), executa `bunx prisma migrate deploy` e `bunx prisma db seed`, e é encerrado com código de saída 0.
-* O serviço `api` (estágio `runtime`) depende estritamente do sucesso prévio do migrator (`condition: service_completed_successfully`), garantindo separação limpa de responsabilidades entre tarefas de migração e o servidor HTTP.
-
-### 5.2. Ambiente de Produção em Nuvem (Render)
-Em plataformas PaaS em nuvem sem suporte a orquestração multi-container no plano gratuito, a inicialização é coordenada de forma autônoma e segura pelo script de entrada do container ([`scripts/start.sh`](./scripts/start.sh)):
+### 5.1. Inicialização Coordenada no Startup
+Tanto no Docker Compose local quanto no container de produção implantado no Render, a inicialização é coordenada de forma segura e idempotente pelo script de entrada do container ([`scripts/start.sh`](./scripts/start.sh)):
 ```bash
 #!/bin/sh
 set -e
@@ -148,7 +143,7 @@ bun run db:deploy
 bun run db:seed
 exec bun run start
 ```
-* **`bun run db:deploy` (`prisma migrate deploy`):** Avalia o PostgreSQL gerenciado do Render e aplica migrations pendentes de forma atômica e idempotente.
+* **`bun run db:deploy` (`prisma migrate deploy`):** Avalia o PostgreSQL (seja o container local ou o banco gerenciado no Render) e aplica migrations pendentes de forma atômica e idempotente.
 * **`bun run db:seed` (`prisma db seed`):** Executa rotinas idempotentes de carga inicial (criação de roles `USER`, `AGENT`, `ADMIN`, categorias padrão e provisionamento do administrador do sistema caso inexistente).
 * **`bun run start` (`bun src/index.js`):** Inicializa o servidor HTTP na porta parametrizada após a confirmação do estado íntegro do schema e dos dados essenciais.
-* **Monitoramento Contínuo:** O endpoint `/health` é sondado periodicamente pelo mecanismo de health check da infraestrutura para validação de integridade operacional.
+* **Monitoramento e Orquestração Local:** No `docker-compose.yml`, o serviço `api` aguarda a prontidão do container PostgreSQL via health check (`condition: service_healthy`) antes de disparar o script de startup, dispensando containers efêmeros redundantes. O endpoint `/health` é sondado periodicamente pelo mecanismo de health check para validação de integridade operacional.

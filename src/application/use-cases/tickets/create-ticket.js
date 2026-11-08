@@ -3,10 +3,11 @@ import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 
 export class CreateTicket {
-  constructor({ ticketsRepository, categoriesRepository, ticketEventsRepository }) {
+  constructor({ ticketsRepository, categoriesRepository, ticketEventsRepository, transactionRunner }) {
     this.ticketsRepository = ticketsRepository;
     this.categoriesRepository = categoriesRepository;
     this.ticketEventsRepository = ticketEventsRepository;
+    this.transactionRunner = transactionRunner;
   }
 
   async execute({ title, description, priority = 'MEDIUM', requesterId, categoryId, dueDate = null }) {
@@ -19,24 +20,28 @@ export class CreateTicket {
       throw new BadRequestError('Categorias inativas não podem ser utilizadas na abertura de novos chamados');
     }
 
-    const createdTicket = await this.ticketsRepository.create({
-      title,
-      description,
-      priority,
-      requesterId,
-      categoryId,
-      dueDate,
-    });
+    const createdTicket = await this.transactionRunner.run(async () => {
+      const ticket = await this.ticketsRepository.create({
+        title,
+        description,
+        priority,
+        requesterId,
+        categoryId,
+        dueDate,
+      });
 
-    await this.ticketEventsRepository.create({
-      ticketId: createdTicket.id,
-      userId: requesterId,
-      type: 'CREATED',
-      metadata: {
-        title: createdTicket.title,
-        priority: createdTicket.priority,
-        categoryId: createdTicket.categoryId,
-      },
+      await this.ticketEventsRepository.create({
+        ticketId: ticket.id,
+        userId: requesterId,
+        type: 'CREATED',
+        metadata: {
+          title: ticket.title,
+          priority: ticket.priority,
+          categoryId: ticket.categoryId,
+        },
+      });
+
+      return ticket;
     });
 
     return TicketMapper.toDTO(createdTicket);

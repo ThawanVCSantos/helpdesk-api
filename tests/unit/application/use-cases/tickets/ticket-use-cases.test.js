@@ -8,7 +8,6 @@ import { ChangeTicketStatus } from '../../../../../src/application/use-cases/tic
 import { CreateComment } from '../../../../../src/application/use-cases/comments/create-comment.js';
 import { ListComments } from '../../../../../src/application/use-cases/comments/list-comments.js';
 import { GetCommentById } from '../../../../../src/application/use-cases/comments/get-comment-by-id.js';
-import { logger } from '../../../../../src/infrastructure/logging/logger.js';
 import { ListTicketEvents } from '../../../../../src/application/use-cases/tickets/list-ticket-events.js';
 
 import { BadRequestError } from '../../../../../src/domain/errors/bad-request-error.js';
@@ -19,6 +18,7 @@ import { Category } from '../../../../../src/domain/entities/category.js';
 import { Comment } from '../../../../../src/domain/entities/comment.js';
 import { TicketEvent } from '../../../../../src/domain/entities/ticket-event.js';
 import { User } from '../../../../../src/domain/entities/user.js';
+import { makeTransactionRunner } from '../../../helpers/transaction-runner.js';
 
 describe('Tickets & Business Rules Use Cases', () => {
   const userCommon = { id: 'user-1', roles: ['USER'] };
@@ -39,6 +39,7 @@ describe('Tickets & Business Rules Use Cases', () => {
       ticketsRepository,
       categoriesRepository,
       ticketEventsRepository,
+      transactionRunner: makeTransactionRunner({ ticketsRepository, ticketEventsRepository }),
     });
 
     const result = await useCase.execute({
@@ -122,6 +123,7 @@ describe('Tickets & Business Rules Use Cases', () => {
       ticketsRepository,
       usersRepository,
       ticketEventsRepository,
+      transactionRunner: makeTransactionRunner({ ticketsRepository, ticketEventsRepository }),
     });
 
     const result = await useCase.execute({
@@ -151,6 +153,7 @@ describe('Tickets & Business Rules Use Cases', () => {
       ticketsRepository,
       usersRepository,
       ticketEventsRepository,
+      transactionRunner: makeTransactionRunner({ ticketsRepository, ticketEventsRepository }),
     });
 
     await expect(
@@ -178,7 +181,11 @@ describe('Tickets & Business Rules Use Cases', () => {
     };
     const ticketEventsRepository = { create: vi.fn() };
 
-    const useCase = new ChangeTicketStatus({ ticketsRepository, ticketEventsRepository });
+    const useCase = new ChangeTicketStatus({
+      ticketsRepository,
+      ticketEventsRepository,
+      transactionRunner: makeTransactionRunner({ ticketsRepository, ticketEventsRepository }),
+    });
     const result = await useCase.execute({ id: 't-1', actorUser: userAgent, status: 'CLOSED' });
 
     expect(result.status).toBe('CLOSED');
@@ -200,6 +207,7 @@ describe('Tickets & Business Rules Use Cases', () => {
       ticketsRepository,
       commentsRepository,
       ticketEventsRepository,
+      transactionRunner: makeTransactionRunner({ commentsRepository, ticketEventsRepository }),
     });
 
     const result = await useCase.execute({
@@ -214,7 +222,7 @@ describe('Tickets & Business Rules Use Cases', () => {
     );
   });
 
-  it('logs notification failures without failing comment creation', async () => {
+  it('fails the transaction when comment notifications cannot be persisted', async () => {
     const ticket = new Ticket({ id: 't-1', requesterId: userCommon.id, status: 'OPEN' });
     const commentsRepository = {
       create: vi.fn().mockResolvedValue(new Comment({
@@ -227,30 +235,20 @@ describe('Tickets & Business Rules Use Cases', () => {
     const dispatchTicketNotifications = {
       execute: vi.fn().mockRejectedValue(new Error('notification database unavailable')),
     };
-    const loggerSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
-
+    const ticketEventsRepository = { create: vi.fn() };
     const useCase = new CreateComment({
       ticketsRepository: { findById: vi.fn().mockResolvedValue(ticket) },
       commentsRepository,
-      ticketEventsRepository: { create: vi.fn() },
+      ticketEventsRepository,
       dispatchTicketNotifications,
+      transactionRunner: makeTransactionRunner(),
     });
 
     await expect(useCase.execute({
       ticketId: 't-1',
       user: userCommon,
       content: 'Aguardando atualização.',
-    })).resolves.toMatchObject({ id: 'c-1' });
-
-    expect(loggerSpy).toHaveBeenCalledWith(
-      'Failed to dispatch comment notifications',
-      expect.objectContaining({
-        ticketId: 't-1',
-        commentId: 'c-1',
-        error: 'notification database unavailable',
-      })
-    );
-    loggerSpy.mockRestore();
+    })).rejects.toThrow('notification database unavailable');
   });
 
   it('lists comments and ticket events', async () => {
@@ -338,6 +336,7 @@ describe('Tickets & Business Rules Use Cases', () => {
       ticketsRepository,
       categoriesRepository,
       ticketEventsRepository,
+      transactionRunner: makeTransactionRunner({ ticketsRepository, ticketEventsRepository }),
     });
 
     const result = await useCase.execute({

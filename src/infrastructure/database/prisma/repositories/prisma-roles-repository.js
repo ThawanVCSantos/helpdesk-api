@@ -1,10 +1,6 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 
-export class PrismaRolesRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaRolesRepository extends BasePrismaRepository {
   async findByNames(names) {
     return this.prisma.role.findMany({
       where: { name: { in: names } },
