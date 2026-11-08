@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { CommentMapper } from '../../../../application/mappers/comment-mapper.js';
 
-export class PrismaCommentsRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaCommentsRepository extends BasePrismaRepository {
   async create({ ticketId, userId, content }) {
     const raw = await this.prisma.comment.create({
       data: {

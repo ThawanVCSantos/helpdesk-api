@@ -3,6 +3,7 @@ import { CreateUser } from '../../../../../src/application/use-cases/users/creat
 import { ConflictError } from '../../../../../src/domain/errors/conflict-error.js';
 import { NotFoundError } from '../../../../../src/domain/errors/not-found-error.js';
 import { UpdateUser } from '../../../../../src/application/use-cases/users/update-user.js';
+import { makeTransactionRunner } from '../../../helpers/transaction-runner.js';
 
 describe('Users Use Cases (Unit)', () => {
   it('should throw ConflictError if email is already registered', async () => {
@@ -66,6 +67,10 @@ describe('Users Use Cases (Unit)', () => {
       userTokensRepository: mockUserTokensRepo,
       hashService: mockHashService,
       mailService: mockMailService,
+      transactionRunner: makeTransactionRunner({
+        usersRepository: mockUsersRepo,
+        userTokensRepository: mockUserTokensRepo,
+      }),
     });
 
     const result = await useCase.execute({

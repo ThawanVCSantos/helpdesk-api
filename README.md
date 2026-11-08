@@ -708,6 +708,79 @@ O SMTP é necessário para recuperação de senha, definição da senha inicial 
 
 A arquitetura é estruturada seguindo princípios de **Clean Architecture**, com separação estrita de regras de negócio, casos de uso, apresentação HTTP, persistência e integrações externas.
 
+## Decisões arquiteturais
+
+### Transações e consistência do domínio (Unit of Work com AsyncLocalStorage)
+
+Operações que alteram mais de uma entidade relacionada utilizam transações do
+Prisma por meio de um `TransactionRunner` baseado no `AsyncLocalStorage` nativo do Node.js.
+
+Essa decisão traz diferenciais importantes de arquitetura e manutenibilidade:
+- **Clean Architecture estrita e desacoplamento:** os casos de uso mantêm o foco apenas nas regras de negócio e continuam utilizando os repositórios e services que já foram injetados em seu construtor via Injeção de Dependências, sem acoplamento a objetos do Prisma ou tokens manuais de conexão (`tx`).
+- **Propagação contextual e transparente:** qualquer operação assíncrona executada dentro do callback do runner — seja um método de repositório chamado diretamente ou dentro de um caso de uso auxiliar (como o `DispatchTicketNotifications`) — herda automaticamente a mesma transação aberta.
+- **Transações aninhadas seguras:** o runner verifica se já existe uma transação ativa no fluxo assíncrono antes de abrir uma nova, reaproveitando o contexto e garantindo atomicidade perfeita sem lock-ups.
+- **Isolamento e concorrência:** como o contexto é isolado por cadeia assíncrona, múltiplas requisições concorrentes executam transações independentes e paralelas com total segurança no Event Loop.
+
+Esse controle transacional é aplicado em operações críticas como:
+
+- criação de chamado junto com seu evento inicial de auditoria `TicketEvent`;
+- atualização de chamado, auditoria de mudanças (`PRIORITY_CHANGED`, etc.) e disparo atômico das notificações relacionadas (`DispatchTicketNotifications`);
+- atribuição ou alteração de status de chamado junto ao seu evento e notificações;
+- criação de comentário no chamado com seu evento `COMMENT_ADDED` e notificações;
+- criação de usuário acompanhada do token de primeiro acesso (`PASSWORD_SETUP`);
+- solicitação de recuperação de senha (revogação atômica dos tokens anteriores e emissão do novo);
+- redefinição de senha junto com o consumo e marcação do token como utilizado.
+
+Se qualquer uma dessas etapas falhar, o rollback é disparado automaticamente para toda a cadeia. O envio físico do e-mail não bloqueia nem participa da transação do banco: ele é tratado como integração externa de forma assíncrona e resiliente pelo padrão Outbox de notificações.
+
+### Outbox de notificações
+
+Quando uma alteração precisa gerar uma comunicação, a aplicação registra uma
+`Notification` persistida com canal, destinatário e estado dentro da mesma
+transação da alteração de domínio e do `TicketEvent`. As notificações internas
+são disponibilizadas imediatamente; as de e-mail começam como `PENDING` e são
+processadas pelo worker agendado.
+
+O worker atualiza os estados `PROCESSING`, `DELIVERED` e `FAILED`, contabiliza
+as tentativas e salva `lastError`. Dessa forma, a indisponibilidade temporária
+do SMTP não bloqueia a requisição principal nem elimina a intenção de envio.
+O processamento pode ser executado automaticamente pelo scheduler ou acionado
+manualmente por um administrador.
+
+O envio SMTP continua fora da transação. Assim, uma falha na criação da
+notificação faz rollback da alteração de domínio e do evento, enquanto uma
+falha temporária de SMTP ocorre depois e pode ser tratada pelo estado `FAILED`
+e pelas retentativas do worker.
+
+### Separação de responsabilidades
+
+- **Casos de uso:** concentram regras de autorização, transições,
+  imutabilidade e consistência do domínio.
+- **Repositórios:** isolam o acesso ao PostgreSQL e ao Prisma.
+- **Factories:** compõem as dependências em um único ponto e facilitam o uso
+  de implementações substitutas nos testes.
+- **Adaptadores de infraestrutura:** Express, Prisma, SMTP e Cloudinary ficam
+  nas bordas da aplicação.
+- **Ponto de entrada:** `app.js` configura a aplicação para os testes e
+  `server.js` inicia o processo, os schedulers e o encerramento controlado.
+
+Essa organização permite testar casos de uso sem subir HTTP, banco, SMTP ou
+Cloudinary, além de reduzir o risco de regras de negócio ficarem espalhadas
+em controllers e integrações.
+
+### Docker multi-stage
+
+O `Dockerfile` utiliza múltiplos estágios para separar responsabilidades:
+
+- `dependencies` instala as dependências completas;
+- `builder` gera o cliente Prisma;
+- `production-dependencies` instala apenas as dependências de produção;
+- `runtime` recebe somente os artefatos necessários para executar a API.
+
+Essa organização reduz o conteúdo da imagem final, evita levar ferramentas de
+desenvolvimento para produção e mantém a geração do cliente Prisma separada da
+execução da aplicação.
+
 ## Identificadores
 
 As entidades do sistema utilizam **UUIDs** como identificadores padronizados.

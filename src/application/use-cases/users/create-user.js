@@ -3,12 +3,13 @@ import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { UserMapper } from '../../mappers/user-mapper.js';
 
 export class CreateUser {
-  constructor({ usersRepository, rolesRepository, userTokensRepository, hashService, mailService }) {
+  constructor({ usersRepository, rolesRepository, userTokensRepository, hashService, mailService, transactionRunner }) {
     this.usersRepository = usersRepository;
     this.rolesRepository = rolesRepository;
     this.userTokensRepository = userTokensRepository;
     this.hashService = hashService;
     this.mailService = mailService;
+    this.transactionRunner = transactionRunner;
   }
 
   async execute({ name, email, roles = ['USER'] }) {
@@ -26,25 +27,29 @@ export class CreateUser {
       throw new NotFoundError(`Perfil de acesso (role) '${missingRole}' não encontrado`);
     }
 
-    const createdUser = await this.usersRepository.create({
-      name,
-      email: normalizedEmail,
-      password: null,
-      active: true,
-      roleNames: roles,
-    });
-
     const rawToken = this.hashService.randomToken();
     const hashedToken = this.hashService.hash(rawToken, 'sha256');
 
     const minutes = Number(process.env.PASSWORD_RESET_TOKEN_EXPIRES_IN_MINUTES) || 15;
     const expiresAt = new Date(Date.now() + minutes * 60 * 1000);
 
-    await this.userTokensRepository.create({
-      userId: createdUser.id,
-      token: hashedToken,
-      type: 'PASSWORD_SETUP',
-      expiresAt,
+    const createdUser = await this.transactionRunner.run(async () => {
+      const user = await this.usersRepository.create({
+        name,
+        email: normalizedEmail,
+        password: null,
+        active: true,
+        roleNames: roles,
+      });
+
+      await this.userTokensRepository.create({
+        userId: user.id,
+        token: hashedToken,
+        type: 'PASSWORD_SETUP',
+        expiresAt,
+      });
+
+      return user;
     });
 
     await this.mailService.sendMail({

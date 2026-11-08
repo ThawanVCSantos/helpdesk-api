@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { TicketEventMapper } from '../../../../application/mappers/ticket-event-mapper.js';
 
-export class PrismaTicketEventsRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaTicketEventsRepository extends BasePrismaRepository {
   async create({ ticketId, userId = null, type, metadata = null }) {
     const raw = await this.prisma.ticketEvent.create({
       data: {

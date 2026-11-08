@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { AttachmentMapper } from '../../../../application/mappers/attachment-mapper.js';
 
-export class PrismaAttachmentsRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaAttachmentsRepository extends BasePrismaRepository {
   async createForTicket({ ticketId, storageKey, fileName, mimeType, size }) {
     const raw = await this.prisma.attachment.create({
       data: {

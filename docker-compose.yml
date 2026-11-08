@@ -16,20 +16,6 @@ services:
       retries: 10
       start_period: 5s
 
-  migrate:
-    build:
-      context: .
-      target: migrator
-    env_file:
-      - .env
-    volumes:
-      - ./prisma:/app/prisma
-    depends_on:
-      postgres:
-        condition: service_healthy
-    command: ["sh", "-c", "bunx prisma migrate deploy && bunx prisma db seed"]
-    restart: "no"
-
   api:
     build:
       context: .
@@ -37,8 +23,8 @@ services:
     env_file:
       - .env
     depends_on:
-      migrate:
-        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
     ports:
       - "127.0.0.1:${PORT:-3000}:3000"
     healthcheck:

@@ -1,12 +1,8 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { NotificationMapper } from '../../../../application/mappers/notification-mapper.js';
 import { MAX_NOTIFICATION_ATTEMPTS } from '../../../../shared/constants/notifications.js';
 
-export class PrismaNotificationsRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaNotificationsRepository extends BasePrismaRepository {
   async create({ userId, ticketId = null, type, channel, status = 'PENDING' }) {
     const deliveredAt = status === 'DELIVERED' ? new Date() : null;
     const raw = await this.prisma.notification.create({

@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { CategoryMapper } from '../../../../application/mappers/category-mapper.js';
 
-export class PrismaCategoriesRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaCategoriesRepository extends BasePrismaRepository {
   async findById(id) {
     const raw = await this.prisma.category.findUnique({
       where: { id },

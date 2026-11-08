@@ -1,11 +1,12 @@
 import { BadRequestError } from '../../../domain/errors/bad-request-error.js';
 
 export class ResetPassword {
-  constructor({ usersRepository, userTokensRepository, hashService, passwordHasher }) {
+  constructor({ usersRepository, userTokensRepository, hashService, passwordHasher, transactionRunner }) {
     this.usersRepository = usersRepository;
     this.userTokensRepository = userTokensRepository;
     this.hashService = hashService;
     this.passwordHasher = passwordHasher;
+    this.transactionRunner = transactionRunner;
   }
 
   async execute({ token, password }) {
@@ -26,9 +27,10 @@ export class ResetPassword {
 
     const hashedPassword = await this.passwordHasher.hash(password);
 
-    await this.usersRepository.update(userToken.userId, { password: hashedPassword });
-
-    await this.userTokensRepository.markAsUsed(userToken.id);
+    await this.transactionRunner.run(async () => {
+      await this.usersRepository.update(userToken.userId, { password: hashedPassword });
+      await this.userTokensRepository.markAsUsed(userToken.id);
+    });
 
     return { message: 'Senha redefinida com sucesso!' };
   }

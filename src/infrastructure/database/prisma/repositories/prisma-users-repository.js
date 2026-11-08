@@ -1,11 +1,7 @@
-import { db } from '../prisma-client.js';
+import { BasePrismaRepository } from './base-prisma-repository.js';
 import { UserMapper } from '../../../../application/mappers/user-mapper.js';
 
-export class PrismaUsersRepository {
-  constructor(prisma = db) {
-    this.prisma = prisma;
-  }
-
+export class PrismaUsersRepository extends BasePrismaRepository {
   async findByEmail(email) {
     const raw = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase().trim() },

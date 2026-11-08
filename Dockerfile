@@ -12,14 +12,6 @@ COPY prisma ./prisma
 COPY src ./src
 RUN bun run db:generate
 
-FROM dependencies AS migrator
-WORKDIR /app
-COPY prisma.config.js ./
-COPY prisma ./prisma
-COPY src ./src
-RUN bun run db:generate
-CMD ["./node_modules/.bin/prisma", "migrate", "deploy"]
-
 FROM oven/bun:1.3.3-debian AS production-dependencies
 WORKDIR /app
 ENV LEFTHOOK=0

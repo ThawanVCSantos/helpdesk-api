@@ -2,14 +2,20 @@ import { BadRequestError } from '../../../domain/errors/bad-request-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { canHandleTickets } from '../../../shared/utils/roles.js';
-import { logger } from '../../../infrastructure/logging/logger.js';
 
 export class AssignTicket {
-  constructor({ ticketsRepository, usersRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
+  constructor({
+    ticketsRepository,
+    usersRepository,
+    ticketEventsRepository,
+    dispatchTicketNotifications,
+    transactionRunner,
+  }) {
     this.ticketsRepository = ticketsRepository;
     this.usersRepository = usersRepository;
     this.ticketEventsRepository = ticketEventsRepository;
     this.dispatchTicketNotifications = dispatchTicketNotifications;
+    this.transactionRunner = transactionRunner;
   }
 
   async execute({ id, actorUser, assignedUserId }) {
@@ -37,35 +43,30 @@ export class AssignTicket {
       }
     }
 
-    const updated = await this.ticketsRepository.update(id, { assignedUserId });
-
     const eventType = assignedUserId ? 'ASSIGNED' : 'UNASSIGNED';
-    await this.ticketEventsRepository.create({
-      ticketId: id,
-      userId: actorUser.id,
-      type: eventType,
-      metadata: {
-        previousAssignedUserId: ticket.assignedUserId,
-        newAssignedUserId: assignedUserId,
-      },
-    });
+    const updated = await this.transactionRunner.run(async () => {
+      const updatedTicket = await this.ticketsRepository.update(id, { assignedUserId });
 
-    if (this.dispatchTicketNotifications) {
-      try {
+      await this.ticketEventsRepository.create({
+        ticketId: id,
+        userId: actorUser.id,
+        type: eventType,
+        metadata: {
+          previousAssignedUserId: ticket.assignedUserId,
+          newAssignedUserId: assignedUserId,
+        },
+      });
+
+      if (this.dispatchTicketNotifications) {
         await this.dispatchTicketNotifications.execute({
-          ticket: updated,
+          ticket: updatedTicket,
           actorUserId: actorUser.id,
           type: 'TICKET_ASSIGNED',
-        });
-      } catch (error) {
-        logger.error('Failed to dispatch ticket notifications', {
-          ticketId: id,
-          actorUserId: actorUser.id,
-          type: 'TICKET_ASSIGNED',
-          error: error.message,
         });
       }
-    }
+
+      return updatedTicket;
+    });
 
     return TicketMapper.toDTO(updated);
   }

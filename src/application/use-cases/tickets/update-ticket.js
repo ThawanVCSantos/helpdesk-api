@@ -3,14 +3,20 @@ import { ForbiddenError } from '../../../domain/errors/forbidden-error.js';
 import { NotFoundError } from '../../../domain/errors/not-found-error.js';
 import { TicketMapper } from '../../mappers/ticket-mapper.js';
 import { isUserOnly } from '../../../shared/utils/roles.js';
-import { logger } from '../../../infrastructure/logging/logger.js';
 
 export class UpdateTicket {
-  constructor({ ticketsRepository, categoriesRepository, ticketEventsRepository, dispatchTicketNotifications = null }) {
+  constructor({
+    ticketsRepository,
+    categoriesRepository,
+    ticketEventsRepository,
+    dispatchTicketNotifications,
+    transactionRunner,
+  }) {
     this.ticketsRepository = ticketsRepository;
     this.categoriesRepository = categoriesRepository;
     this.ticketEventsRepository = ticketEventsRepository;
     this.dispatchTicketNotifications = dispatchTicketNotifications;
+    this.transactionRunner = transactionRunner;
   }
 
   async execute({ id, user, title, description, priority, categoryId, dueDate }) {
@@ -46,52 +52,46 @@ export class UpdateTicket {
     if (categoryId !== undefined) updateData.categoryId = categoryId;
     if (dueDate !== undefined) updateData.dueDate = dueDate;
 
-    const updated = await this.ticketsRepository.update(id, updateData);
+    const updated = await this.transactionRunner.run(async () => {
+      const updatedTicket = await this.ticketsRepository.update(id, updateData);
 
-    // Auditoria de eventos
-    if (priority && priority !== ticket.priority) {
-      await this.ticketEventsRepository.create({
-        ticketId: id,
-        userId: user.id,
-        type: 'PRIORITY_CHANGED',
-        metadata: { oldPriority: ticket.priority, newPriority: priority },
-      });
+      if (priority && priority !== ticket.priority) {
+        await this.ticketEventsRepository.create({
+          ticketId: id,
+          userId: user.id,
+          type: 'PRIORITY_CHANGED',
+          metadata: { oldPriority: ticket.priority, newPriority: priority },
+        });
 
-      if (this.dispatchTicketNotifications) {
-        try {
+        if (this.dispatchTicketNotifications) {
           await this.dispatchTicketNotifications.execute({
-            ticket: updated,
+            ticket: updatedTicket,
             actorUserId: user.id,
             type: 'PRIORITY_CHANGED',
-          });
-        } catch (error) {
-          logger.error('Failed to dispatch ticket notifications', {
-            ticketId: id,
-            actorUserId: user.id,
-            type: 'PRIORITY_CHANGED',
-            error: error.message,
           });
         }
       }
-    }
 
-    if (categoryId && categoryId !== ticket.categoryId) {
-      await this.ticketEventsRepository.create({
-        ticketId: id,
-        userId: user.id,
-        type: 'CATEGORY_CHANGED',
-        metadata: { oldCategoryId: ticket.categoryId, newCategoryId: categoryId },
-      });
-    }
+      if (categoryId && categoryId !== ticket.categoryId) {
+        await this.ticketEventsRepository.create({
+          ticketId: id,
+          userId: user.id,
+          type: 'CATEGORY_CHANGED',
+          metadata: { oldCategoryId: ticket.categoryId, newCategoryId: categoryId },
+        });
+      }
 
-    if (dueDate !== undefined && String(dueDate) !== String(ticket.dueDate)) {
-      await this.ticketEventsRepository.create({
-        ticketId: id,
-        userId: user.id,
-        type: 'DUE_DATE_CHANGED',
-        metadata: { oldDueDate: ticket.dueDate, newDueDate: dueDate },
-      });
-    }
+      if (dueDate !== undefined && String(dueDate) !== String(ticket.dueDate)) {
+        await this.ticketEventsRepository.create({
+          ticketId: id,
+          userId: user.id,
+          type: 'DUE_DATE_CHANGED',
+          metadata: { oldDueDate: ticket.dueDate, newDueDate: dueDate },
+        });
+      }
+
+      return updatedTicket;
+    });
 
     return TicketMapper.toDTO(updated);
   }
